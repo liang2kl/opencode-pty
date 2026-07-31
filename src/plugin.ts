@@ -29,18 +29,7 @@ export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<P
         open(ptyServer.server.url.origin)
       } else if (input.command === ptyShowServerUrlCommand) {
         const message = `PTY Sessions Web Interface URL: ${ptyServer.server.url.origin}`
-        await client.session.prompt({
-          path: { id: input.sessionID },
-          body: {
-            noReply: true,
-            parts: [
-              {
-                type: 'text',
-                text: message,
-              },
-            ],
-          },
-        })
+        await client.tui.showToast({ body: { message, variant: 'info' } })
       }
       throw new Error('Command handled by PTY plugin')
     },
