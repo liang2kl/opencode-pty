@@ -153,6 +153,7 @@ describe('PTY Manager Integration', () => {
       const testSession = sessions.find((s) => s.id === sessionInfo.session.id)
       expect(testSession).toBeDefined()
       if (!testSession) return
+      expect(testSession.parentSessionId).toBe(managedTestServer.sessionId)
       expect(testSession.command).toBe('node')
       expect(testSession.args).toEqual(['-e', "console.log('test')"])
       expect(testSession.status).toBeDefined()

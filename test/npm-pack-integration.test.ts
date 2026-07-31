@@ -91,6 +91,7 @@ describe('npm pack integration', () => {
     // Verify the package structure (compiled JS shipped in dist/)
     const packageDir = join(tempDir, 'node_modules/opencode-pty')
     expect(existsSync(join(packageDir, 'dist/src/plugin/pty/manager.js'))).toBe(true)
+    expect(existsSync(join(packageDir, 'dist/src/tui.js'))).toBe(true)
     expect(existsSync(join(packageDir, 'dist/web/index.html'))).toBe(true)
     const portFile = join('/tmp', 'test-server-port-0.txt')
     if (await Bun.file(portFile).exists()) {

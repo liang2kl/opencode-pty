@@ -42,6 +42,29 @@ function notifySessionUpdate(session: PTYSessionInfo) {
   }
 }
 
+type SessionRemoveCallback = (sessionId: string) => void
+
+export const sessionRemoveCallbacks: SessionRemoveCallback[] = []
+
+export function registerSessionRemoveCallback(callback: SessionRemoveCallback) {
+  sessionRemoveCallbacks.push(callback)
+}
+
+export function removeSessionRemoveCallback(callback: SessionRemoveCallback) {
+  const index = sessionRemoveCallbacks.indexOf(callback)
+  if (index !== -1) sessionRemoveCallbacks.splice(index, 1)
+}
+
+function notifySessionRemove(sessionId: string) {
+  for (const callback of sessionRemoveCallbacks) {
+    try {
+      callback(sessionId)
+    } catch {
+      // Ignore callback errors
+    }
+  }
+}
+
 type RawOutputCallback = (session: PTYSessionInfo, rawData: string) => void
 
 export const rawOutputCallbacks: RawOutputCallback[] = []
@@ -77,7 +100,9 @@ class PTYManager {
   }
 
   clearAllSessions(): void {
+    const ids = this.list().map((session) => session.id)
     this.lifecycleManager.clearAllSessions()
+    ids.forEach(notifySessionRemove)
   }
 
   spawn(opts: SpawnOptions): PTYSessionInfo {
@@ -87,6 +112,7 @@ class PTYManager {
         notifyRawOutput(this.lifecycleManager.toInfo(session), data)
       },
       async (session, exitCode) => {
+        if (!this.lifecycleManager.getSession(session.id)) return
         notifySessionUpdate(this.lifecycleManager.toInfo(session))
         if (session?.notifyOnExit) {
           await this.notificationManager.sendExitNotification(session, exitCode || 0)
@@ -150,11 +176,18 @@ class PTYManager {
   }
 
   kill(id: string, cleanup: boolean = false): boolean {
-    return this.lifecycleManager.kill(id, cleanup)
+    const removed = cleanup && this.lifecycleManager.getSession(id) !== null
+    const success = this.lifecycleManager.kill(id, cleanup)
+    if (success && removed) notifySessionRemove(id)
+    return success
   }
 
   cleanupBySession(parentSessionId: string): void {
+    const ids = this.list()
+      .filter((session) => session.parentSessionId === parentSessionId)
+      .map((session) => session.id)
     this.lifecycleManager.cleanupBySession(parentSessionId)
+    ids.forEach(notifySessionRemove)
   }
 }
 

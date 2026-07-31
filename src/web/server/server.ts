@@ -22,7 +22,10 @@ export class PTYServer implements Disposable {
   private readonly staticRoutes: Record<string, Response>
   private readonly stack = new DisposableStack()
 
-  private constructor(staticRoutes: Record<string, Response>) {
+  private constructor(
+    staticRoutes: Record<string, Response>,
+    private readonly owner: string
+  ) {
     this.staticRoutes = staticRoutes
     this.server = this.startWebServer()
     this.stack.use(this.server)
@@ -33,10 +36,10 @@ export class PTYServer implements Disposable {
     this.stack.dispose()
   }
 
-  public static async createServer(): Promise<PTYServer> {
+  public static async createServer(owner: string = ''): Promise<PTYServer> {
     const staticRoutes = await buildStaticRoutes()
 
-    return new PTYServer(staticRoutes)
+    return new PTYServer(staticRoutes, owner)
   }
 
   private startWebServer(): Server<undefined> {
@@ -74,7 +77,10 @@ export class PTYServer implements Disposable {
       websocket: {
         data: undefined as undefined,
         perMessageDeflate: true,
-        open: (ws) => ws.subscribe('sessions:update'),
+        open: (ws) => {
+          ws.subscribe('sessions:update')
+          ws.send(JSON.stringify({ type: 'server_info', owner: this.owner }))
+        },
         message: handleWebSocketMessage,
         close: (ws) => {
           ws.subscriptions.forEach((topic) => {

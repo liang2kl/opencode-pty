@@ -60,6 +60,8 @@ export interface WSMessageServer {
     | 'readRawResponse'
     | 'session_list'
     | 'session_update'
+    | 'session_removed'
+    | 'server_info'
     | 'error'
 }
 
@@ -93,6 +95,16 @@ export interface WSMessageServerSessionList extends WSMessageServer {
 export interface WSMessageServerSessionUpdate extends WSMessageServer {
   type: 'session_update'
   session: PTYSessionInfo
+}
+
+export interface WSMessageServerSessionRemoved extends WSMessageServer {
+  type: 'session_removed'
+  sessionId: string
+}
+
+export interface WSMessageServerInfo extends WSMessageServer {
+  type: 'server_info'
+  owner: string
 }
 
 export interface WSMessageServerError extends WSMessageServer {

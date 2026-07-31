@@ -63,6 +63,14 @@ export function App() {
         }
       })
     }, []),
+    onSessionRemove: useCallback(
+      (sessionId: string) => {
+        setSessions((current) => current.filter((session) => session.id !== sessionId))
+        setActiveSession((current) => (current?.id === sessionId ? null : current))
+        setRawOutput((current) => (activeSession?.id === sessionId ? '' : current))
+      },
+      [activeSession?.id]
+    ),
   })
 
   // Update connected from wsConnected

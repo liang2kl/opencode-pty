@@ -12,23 +12,46 @@ import open from 'open'
 const ptyOpenClientCommand = 'pty-open-background-spy'
 const ptyShowServerUrlCommand = 'pty-show-server-url'
 
-export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<PluginResult> => {
+export const PTYPlugin = async ({
+  client,
+  directory,
+  serverUrl,
+}: PluginContext): Promise<PluginResult> => {
   initPermissions(client, directory)
   initManager(client)
   let ptyServer: PTYServer | undefined
 
+  const startServer = async () => {
+    if (ptyServer) return ptyServer
+    try {
+      ptyServer = await PTYServer.createServer(serverUrl.origin)
+      return ptyServer
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await client.tui
+        .showToast({
+          body: { message: `PTY web server unavailable: ${message}`, variant: 'warning' },
+        })
+        .catch(() => {})
+    }
+  }
+
+  await startServer()
+
   return {
+    dispose: async () => {
+      ptyServer?.[Symbol.dispose]()
+    },
     'command.execute.before': async (input) => {
       if (input.command !== ptyOpenClientCommand && input.command !== ptyShowServerUrlCommand) {
         return
       }
-      if (ptyServer === undefined) {
-        ptyServer = await PTYServer.createServer()
-      }
+      const server = await startServer()
+      if (!server) throw new Error('PTY web server is unavailable')
       if (input.command === ptyOpenClientCommand) {
-        open(ptyServer.server.url.origin)
+        open(server.server.url.origin)
       } else if (input.command === ptyShowServerUrlCommand) {
-        const message = `PTY Sessions Web Interface URL: ${ptyServer.server.url.origin}`
+        const message = `PTY Sessions Web Interface URL: ${server.server.url.origin}`
         await client.tui.showToast({ body: { message, variant: 'info' } })
       }
       throw new Error('Command handled by PTY plugin')

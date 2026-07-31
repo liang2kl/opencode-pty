@@ -11,6 +11,6 @@
     "allowImportingTsExtensions": false,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["index.ts", "src/**/*.ts"],
+  "include": ["index.ts", "src/**/*.ts", "src/tui.tsx"],
   "exclude": ["src/web/client/**", "**/*.test.ts", "**/*.spec.ts"]
 }

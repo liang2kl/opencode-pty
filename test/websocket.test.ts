@@ -4,6 +4,7 @@ import type {
   CustomError,
   WSMessageServerError,
   WSMessageServerSessionList,
+  WSMessageServerSessionRemoved,
   WSMessageServerSessionUpdate,
   WSMessageServerSubscribedSession,
   WSMessageServerUnsubscribedSession,
@@ -168,6 +169,47 @@ describe('WebSocket Functionality', () => {
       })
 
       await sessionListPromise
+    }, 1000)
+
+    it('should discover running PTYs when a client reconnects', async () => {
+      const session = manager.spawn({
+        command: 'sleep',
+        args: ['10'],
+        parentSessionId: managedTestServer.sessionId,
+      })
+      await using managedTestClient = await ManagedTestClient.create(
+        managedTestServer.server.getWsUrl()
+      )
+      const sessionList = new Promise<WSMessageServerSessionList>((resolve) => {
+        managedTestClient.sessionListCallbacks.push(resolve)
+      })
+
+      managedTestClient.send({ type: 'session_list' })
+
+      const resumed = (await sessionList).sessions.find((item) => item.id === session.id)
+      expect(resumed?.parentSessionId).toBe(managedTestServer.sessionId)
+      expect(resumed?.status).toBe('running')
+      manager.kill(session.id, true)
+    }, 1000)
+
+    it('should broadcast cleaned-up sessions', async () => {
+      await using managedTestClient = await ManagedTestClient.create(
+        managedTestServer.server.getWsUrl()
+      )
+      const session = manager.spawn({
+        command: 'sleep',
+        args: ['10'],
+        parentSessionId: managedTestServer.sessionId,
+      })
+      const removed = new Promise<WSMessageServerSessionRemoved>((resolve) => {
+        managedTestClient.sessionRemoveCallbacks.push((message) => {
+          if (message.sessionId === session.id) resolve(message)
+        })
+      })
+
+      manager.kill(session.id, true)
+
+      expect((await removed).sessionId).toBe(session.id)
     }, 1000)
 
     it('should handle invalid message format', async () => {

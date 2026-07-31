@@ -26,6 +26,7 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Auto-cleanup**: PTYs are cleaned up when OpenCode sessions end
 - **Web UI**: Modern React-based interface for session management
 - **Real-time Streaming**: WebSocket-based live output updates
+- **TUI Sidebar**: Session-scoped PTY status with clickable live-log dialogs
 
 ## Setup
 
@@ -39,6 +40,19 @@ Add the plugin to your [OpenCode config](https://opencode.ai/docs/config/):
 ```
 
 That's it. OpenCode will automatically install the plugin on next run.
+
+To show running PTYs in OpenCode's session sidebar, also add the package to your TUI config:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": ["opencode-pty"]
+}
+```
+
+The sidebar requires OpenCode 1.18.10 or newer and a fixed `PTY_WEB_PORT`. Clicking a
+session name opens a live, sticky-bottom log dialog. Only PTYs created by the current
+OpenCode session appear in its sidebar.
 
 ## Updating
 
@@ -85,7 +99,7 @@ If you name it "task" or "process" or anything else, the agent will sometimes ru
 1. Run opencode with the plugin.
 2. Run slash command `/pty-open-background-spy`.
 
-This will start the background sessions observer cockpit server and launch the browser with web UI.
+The server starts with the OpenCode plugin. This command launches the browser with the web UI.
 
 ### Features
 
@@ -94,6 +108,20 @@ This will start the background sessions observer cockpit server and launch the b
 - **Interactive Input**: Send commands and input to running processes
 - **Session Management**: Kill sessions directly from the UI
 - **Connection Status**: Visual indicator of WebSocket connection status
+
+### TUI Sidebar
+
+The optional TUI plugin connects to the same WebSocket used by the browser interface. Set a
+fixed port before starting OpenCode so the TUI process can locate it:
+
+```bash
+export PTY_WEB_PORT=4097
+```
+
+The sidebar displays only running PTYs owned by the current OpenCode session. Click a PTY name
+to open its existing output buffer and continue streaming new output in real time. Relaunching
+an attached TUI and resuming the same session repopulates the panel from the running OpenCode
+backend. Restarting the backend itself still terminates its child PTY processes.
 
 ### REST API
 
@@ -233,7 +261,7 @@ This eliminates the need for polling—perfect for long-running processes like b
 | ---------------------- | ---------- | -------------------------------------------------- |
 | `PTY_MAX_BUFFER_LINES` | `50000`    | Maximum lines to keep in output buffer per session |
 | `PTY_WEB_HOSTNAME`     | `::1`      | Hostname for the web server to bind to (IPv6 loopback by default) |
-| `PTY_WEB_PORT`         | `0` (random) | Port for the web server (0 = random port)        |
+| `PTY_WEB_PORT`         | `0` (random) | Port for the web server; the TUI sidebar requires a fixed non-zero port |
 
 ### Permissions
 
