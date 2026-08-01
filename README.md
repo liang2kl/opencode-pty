@@ -351,6 +351,10 @@ bun unittest    # Runs the unit tests
 bun test:e2e    # Runs the e2e tests
 ```
 
+`build:plugin` emits declarations and server modules with TypeScript, then compiles
+`src/tui.tsx` with OpenTUI's Solid universal transform. Keep the TUI build step in place:
+plain TypeScript `react-jsx` output evaluates signal-backed children only once.
+
 To load a local checkout in OpenCode:
 
 ```json

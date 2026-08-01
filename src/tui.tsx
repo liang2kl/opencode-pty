@@ -2,7 +2,7 @@
 
 import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
 import type { ScrollBoxRenderable } from '@opentui/core'
-import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js'
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
 import type { PTYSessionInfo } from './plugin/pty/types.ts'
 import type {
   WSMessageServer,
@@ -40,11 +40,10 @@ const tui: TuiPlugin = async (api) => {
 
   const TaskRow = (props: { session: PTYSessionInfo }) => {
     const [now, setNow] = createSignal(Date.now())
-    const timer = setInterval(() => {
-      setNow(Date.now())
-      api.renderer.requestRender()
-    }, 1000)
-    onCleanup(() => clearInterval(timer))
+    onMount(() => {
+      const timer = setInterval(() => setNow(Date.now()), 1000)
+      onCleanup(() => clearInterval(timer))
+    })
     const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
     const showActivity = createMemo(() => Math.floor(now() / 1000) % 2 === 0)
 
