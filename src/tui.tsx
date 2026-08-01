@@ -20,11 +20,8 @@ import {
   formatRunningTime,
   getPtyWebSocketUrl,
   removeSession,
-  truncateTaskTitle,
   upsertSession,
 } from './tui/core.ts'
-
-const TASK_ROW_TEXT_WIDTH = 35
 
 function plainOutput(data: string): string {
   return Bun.stripANSI(data).replaceAll('\r', '')
@@ -46,9 +43,6 @@ const tui: TuiPlugin = async (api) => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     onCleanup(() => clearInterval(timer))
     const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
-    const title = createMemo(() =>
-      truncateTaskTitle(props.session.title, duration(), TASK_ROW_TEXT_WIDTH)
-    )
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
@@ -56,9 +50,9 @@ const tui: TuiPlugin = async (api) => {
         <text flexShrink={0} fg={api.theme.current.success}>
           •
         </text>
-        <box flexDirection="row" flexGrow={1} justifyContent="space-between">
-          <text wrapMode="none" fg={api.theme.current.text}>
-            {title()}
+        <box flexDirection="row" flexGrow={1} gap={1}>
+          <text flexGrow={1} flexShrink={1} wrapMode="none" truncate fg={api.theme.current.text}>
+            {props.session.title}
           </text>
           <text flexShrink={0} fg={api.theme.current.textMuted}>
             {duration()}

@@ -48,13 +48,6 @@ export function formatRunningTime(createdAt: string, now: number = Date.now()): 
   return `${hours}h ${minutes % 60}m`
 }
 
-export function truncateTaskTitle(title: string, duration: string, rowWidth: number): string {
-  const available = Math.max(1, rowWidth - duration.length - 1)
-  if (title.length <= available) return title
-  if (available === 1) return '…'
-  return `${title.slice(0, available - 1)}…`
-}
-
 export function activeSessionsForParent(
   sessions: PTYSessionInfo[],
   parentSessionId: string
