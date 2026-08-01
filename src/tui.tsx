@@ -2,7 +2,7 @@
 
 import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
 import type { ScrollBoxRenderable } from '@opentui/core'
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js'
+import { For, Show, createMemo, createSignal } from 'solid-js'
 import type { PTYSessionInfo } from './plugin/pty/types.ts'
 import type {
   WSMessageServer,
@@ -33,17 +33,14 @@ const tui: TuiPlugin = async (api) => {
   const [sessions, setSessions] = createSignal<PTYSessionInfo[]>([])
   const [logs, setLogs] = createSignal<Record<string, string>>({})
   const [tasksOpen, setTasksOpen] = createSignal(true)
+  const [now, setNow] = createSignal(Date.now())
   const loadingLogs = new Set<string>()
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let activeLogSessionId: string | undefined
+  const activityTimer = setInterval(() => setNow(Date.now()), 1000)
 
   const TaskRow = (props: { session: PTYSessionInfo }) => {
-    const [now, setNow] = createSignal(Date.now())
-    onMount(() => {
-      const timer = setInterval(() => setNow(Date.now()), 1000)
-      onCleanup(() => clearInterval(timer))
-    })
     const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
     const showActivity = createMemo(() => Math.floor(now() / 1000) % 2 === 0)
 
@@ -51,7 +48,7 @@ const tui: TuiPlugin = async (api) => {
       // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
       <box flexDirection="row" gap={1} onMouseUp={() => openLogs(props.session)}>
         <text flexShrink={0} fg={api.theme.current.success}>
-          {showActivity() ? '•' : ' '}
+          {showActivity() ? '•' : '◦'}
         </text>
         <box flexDirection="row" flexGrow={1} gap={1}>
           <text flexGrow={1} flexShrink={1} wrapMode="none" truncate fg={api.theme.current.text}>
@@ -86,8 +83,18 @@ const tui: TuiPlugin = async (api) => {
         const session = createMemo(
           () => sessions().find((item) => item.id === initial.id) ?? initial
         )
+        const dialogWidth = () => Math.max(1, Math.floor(api.renderer.width / 2))
+        const dialogHeight = () => Math.max(1, Math.floor(api.renderer.height / 2))
         return (
-          <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1} flexDirection="column">
+          <box
+            width={dialogWidth()}
+            height={dialogHeight()}
+            paddingLeft={2}
+            paddingRight={2}
+            paddingBottom={1}
+            gap={1}
+            flexDirection="column"
+          >
             <box flexDirection="row" justifyContent="space-between">
               <text fg={api.theme.current.text}>
                 <b>{session().title}</b>
@@ -101,7 +108,7 @@ const tui: TuiPlugin = async (api) => {
               ref={(value: ScrollBoxRenderable) => {
                 setTimeout(() => value.scrollTo(value.scrollHeight), 0)
               }}
-              height={24}
+              flexGrow={1}
               stickyScroll
               stickyStart="bottom"
             >
@@ -207,6 +214,7 @@ const tui: TuiPlugin = async (api) => {
 
   void connect()
   api.lifecycle.onDispose(() => {
+    clearInterval(activityTimer)
     if (reconnectTimer) clearTimeout(reconnectTimer)
     socket?.close()
   })
