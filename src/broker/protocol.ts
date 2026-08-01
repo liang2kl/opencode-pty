@@ -1,6 +1,6 @@
 import type { PTYSessionInfo, ReadResult, SearchResult, SpawnOptions } from '../plugin/pty/types.ts'
 
-export const BROKER_PROTOCOL_VERSION = 1
+export const BROKER_PROTOCOL_VERSION = 2
 
 export type BrokerOperation =
   | { type: 'spawn'; options: SpawnOptions; processEnv?: Record<string, string> }
@@ -34,7 +34,7 @@ export interface BrokerReadyMessage {
 
 export interface BrokerExitMessage {
   type: 'session_exit'
-  ownerId?: string
+  ownerId: string
   session: PTYSessionInfo
   exitCode: number
   lastLine: string
