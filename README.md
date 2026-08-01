@@ -27,7 +27,7 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Auto-shutdown**: The broker exits after the final OpenCode process disconnects
 - **Web UI**: Modern React-based interface for session management
 - **Real-time Streaming**: WebSocket-based live output updates
-- **TUI Tasks**: Native-style sidebar dropdown with live durations and clickable logs
+- **TUI Tasks**: Native-style sidebar dropdown with flashing activity dots, live durations, and clickable logs
 
 ## Setup
 

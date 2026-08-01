@@ -46,12 +46,13 @@ const tui: TuiPlugin = async (api) => {
     }, 1000)
     onCleanup(() => clearInterval(timer))
     const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
+    const showActivity = createMemo(() => Math.floor(now() / 1000) % 2 === 0)
 
     return (
       // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
       <box flexDirection="row" gap={1} onMouseUp={() => openLogs(props.session)}>
         <text flexShrink={0} fg={api.theme.current.success}>
-          •
+          {showActivity() ? '•' : ' '}
         </text>
         <box flexDirection="row" flexGrow={1} gap={1}>
           <text flexGrow={1} flexShrink={1} wrapMode="none" truncate fg={api.theme.current.text}>
