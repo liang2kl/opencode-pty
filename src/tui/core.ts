@@ -1,7 +1,6 @@
 import type { PTYSessionInfo } from '../plugin/pty/types.ts'
 
 export const PTY_RECONNECT_DELAY_MS = 1000
-export const PTY_LOG_LIMIT = 200_000
 
 export function getPtyWebSocketUrl(env: Record<string, string | undefined>): string | undefined {
   const port = Number(env.PTY_WEB_PORT ?? '4097')
@@ -57,8 +56,4 @@ export function activeSessionsForParent(
       session.parentSessionId === parentSessionId &&
       (session.status === 'running' || session.status === 'killing')
   )
-}
-
-export function appendLog(current: string, chunk: string): string {
-  return `${current}${chunk}`.slice(-PTY_LOG_LIMIT)
 }

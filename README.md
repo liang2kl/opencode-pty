@@ -27,7 +27,7 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Auto-shutdown**: The broker exits after the final OpenCode process disconnects
 - **Web UI**: Modern React-based interface for session management
 - **Real-time Streaming**: WebSocket-based live output updates
-- **TUI Tasks**: Native-style sidebar dropdown with clickable live-log dialogs
+- **TUI Tasks**: Native-style sidebar dropdown with live running durations
 
 ## Setup
 
@@ -54,9 +54,8 @@ To show running PTYs in OpenCode's session sidebar, also add the package to your
 }
 ```
 
-The sidebar requires OpenCode 1.18.10 or newer. Clicking a
-session name opens a live, sticky-bottom log dialog. Only PTYs created by the current
-OpenCode session appear in its sidebar.
+The sidebar requires OpenCode 1.18.10 or newer. Only PTYs created by the current OpenCode
+session appear in its sidebar.
 
 ## Updating
 
@@ -125,9 +124,8 @@ export PTY_WEB_HOSTNAME=100.72.194.42
 export PTY_WEB_PORT=4097
 ```
 
-The sidebar displays only running PTYs owned by the current OpenCode session. Click a PTY name
-to open its existing output buffer and continue streaming new output in real time. Each OpenCode
-process holds a broker lease: when that process exits, the broker kills and removes only its PTYs.
+The sidebar displays only running PTYs owned by the current OpenCode session, with a live duration
+for each task. Each OpenCode process holds a broker lease: when that process exits, the broker kills and removes only its PTYs.
 Other OpenCode processes and their PTYs continue running. When the final process exits, the broker
 kills any remaining sessions and shuts itself down.
 

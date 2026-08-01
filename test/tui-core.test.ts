@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { PTYSessionInfo } from '../src/plugin/pty/types.ts'
 import {
-  PTY_LOG_LIMIT,
   activeSessionsForParent,
-  appendLog,
   formatRunningTime,
   getPtyWebSocketUrl,
   removeSession,
@@ -83,12 +81,5 @@ describe('PTY TUI core', () => {
     expect(formatRunningTime(started, Date.parse('2026-08-01T00:00:42.000Z'))).toBe('42s')
     expect(formatRunningTime(started, Date.parse('2026-08-01T00:02:05.000Z'))).toBe('2m 5s')
     expect(formatRunningTime(started, Date.parse('2026-08-01T03:04:00.000Z'))).toBe('3h 4m')
-  })
-
-  it('bounds retained popup output', () => {
-    const output = appendLog('a'.repeat(PTY_LOG_LIMIT), 'tail')
-
-    expect(output).toHaveLength(PTY_LOG_LIMIT)
-    expect(output.endsWith('tail')).toBe(true)
   })
 })
