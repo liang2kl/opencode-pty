@@ -8,6 +8,7 @@ import {
   getPtyWebSocketUrl,
   removeSession,
   sameServerEndpoint,
+  truncateTaskTitle,
   upsertSession,
 } from '../src/tui/core.ts'
 
@@ -80,15 +81,15 @@ describe('PTY TUI core', () => {
 
   it('formats running time from the task start', () => {
     const started = '2026-08-01T00:00:00.000Z'
-    expect(formatRunningTime(started, Date.parse('2026-08-01T00:00:42.000Z'))).toBe(
-      'Running for 42s'
-    )
-    expect(formatRunningTime(started, Date.parse('2026-08-01T00:02:05.000Z'))).toBe(
-      'Running for 2m 5s'
-    )
-    expect(formatRunningTime(started, Date.parse('2026-08-01T03:04:00.000Z'))).toBe(
-      'Running for 3h 4m'
-    )
+    expect(formatRunningTime(started, Date.parse('2026-08-01T00:00:42.000Z'))).toBe('42s')
+    expect(formatRunningTime(started, Date.parse('2026-08-01T00:02:05.000Z'))).toBe('2m 5s')
+    expect(formatRunningTime(started, Date.parse('2026-08-01T03:04:00.000Z'))).toBe('3h 4m')
+  })
+
+  it('truncates task titles around a right-aligned duration', () => {
+    expect(truncateTaskTitle('Short task', '42s', 20)).toBe('Short task')
+    expect(truncateTaskTitle('A very long task title', '1m 2s', 20)).toBe('A very long t…')
+    expect(truncateTaskTitle('Task', '123456', 7)).toBe('…')
   })
 
   it('bounds retained popup output', () => {

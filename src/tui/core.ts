@@ -38,14 +38,21 @@ export function removeSession(sessions: PTYSessionInfo[], sessionId: string): PT
 
 export function formatRunningTime(createdAt: string, now: number = Date.now()): string {
   const elapsedSeconds = Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 1000))
-  if (elapsedSeconds < 60) return `Running for ${elapsedSeconds}s`
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s`
 
   const minutes = Math.floor(elapsedSeconds / 60)
   const seconds = elapsedSeconds % 60
-  if (minutes < 60) return `Running for ${minutes}m ${seconds}s`
+  if (minutes < 60) return `${minutes}m ${seconds}s`
 
   const hours = Math.floor(minutes / 60)
-  return `Running for ${hours}h ${minutes % 60}m`
+  return `${hours}h ${minutes % 60}m`
+}
+
+export function truncateTaskTitle(title: string, duration: string, rowWidth: number): string {
+  const available = Math.max(1, rowWidth - duration.length - 1)
+  if (title.length <= available) return title
+  if (available === 1) return '…'
+  return `${title.slice(0, available - 1)}…`
 }
 
 export function activeSessionsForParent(

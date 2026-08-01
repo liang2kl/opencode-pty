@@ -2,7 +2,7 @@
 
 import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
 import type { ScrollBoxRenderable } from '@opentui/core'
-import { For, Show, createMemo, createSignal } from 'solid-js'
+import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js'
 import type { PTYSessionInfo } from './plugin/pty/types.ts'
 import type {
   WSMessageServer,
@@ -20,8 +20,11 @@ import {
   formatRunningTime,
   getPtyWebSocketUrl,
   removeSession,
+  truncateTaskTitle,
   upsertSession,
 } from './tui/core.ts'
+
+const TASK_ROW_TEXT_WIDTH = 35
 
 function plainOutput(data: string): string {
   return Bun.stripANSI(data).replaceAll('\r', '')
@@ -33,11 +36,37 @@ const tui: TuiPlugin = async (api) => {
   const [sessions, setSessions] = createSignal<PTYSessionInfo[]>([])
   const [logs, setLogs] = createSignal<Record<string, string>>({})
   const [tasksOpen, setTasksOpen] = createSignal(true)
-  const [now, setNow] = createSignal(Date.now())
   const loadingLogs = new Set<string>()
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let activeLogSessionId: string | undefined
+
+  const TaskRow = (props: { session: PTYSessionInfo }) => {
+    const [now, setNow] = createSignal(Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    onCleanup(() => clearInterval(timer))
+    const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
+    const title = createMemo(() =>
+      truncateTaskTitle(props.session.title, duration(), TASK_ROW_TEXT_WIDTH)
+    )
+
+    return (
+      // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
+      <box flexDirection="row" gap={1} onMouseUp={() => openLogs(props.session)}>
+        <text flexShrink={0} fg={api.theme.current.success}>
+          •
+        </text>
+        <box flexDirection="row" flexGrow={1} justifyContent="space-between">
+          <text wrapMode="none" fg={api.theme.current.text}>
+            {title()}
+          </text>
+          <text flexShrink={0} fg={api.theme.current.textMuted}>
+            {duration()}
+          </text>
+        </box>
+      </box>
+    )
+  }
 
   const send = (message: object) => {
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
@@ -62,6 +91,8 @@ const tui: TuiPlugin = async (api) => {
         )
         const dialogWidth = () => Math.max(1, Math.floor(api.renderer.width / 2))
         const dialogHeight = () => Math.max(1, Math.floor(api.renderer.height / 2))
+        const logHeight = () => Math.max(1, dialogHeight() - 6)
+        let logViewport: ScrollBoxRenderable | undefined
         return (
           <box
             width={dialogWidth()}
@@ -83,13 +114,14 @@ const tui: TuiPlugin = async (api) => {
             </text>
             <scrollbox
               ref={(value: ScrollBoxRenderable) => {
+                if (logViewport === value) return
+                logViewport = value
                 setTimeout(() => value.scrollTo(value.scrollHeight), 0)
               }}
-              flexGrow={1}
-              stickyScroll
-              stickyStart="bottom"
+              width="100%"
+              height={logHeight()}
             >
-              <text fg={api.theme.current.text} wrapMode="word">
+              <text width="100%" fg={api.theme.current.text} wrapMode="word">
                 {logs()[initial.id] || 'Waiting for output...'}
               </text>
             </scrollbox>
@@ -190,10 +222,8 @@ const tui: TuiPlugin = async (api) => {
   }
 
   void connect()
-  const runtimeTimer = setInterval(() => setNow(Date.now()), 1000)
   api.lifecycle.onDispose(() => {
     if (reconnectTimer) clearTimeout(reconnectTimer)
-    clearInterval(runtimeTimer)
     socket?.close()
   })
 
@@ -219,24 +249,7 @@ const tui: TuiPlugin = async (api) => {
                 </text>
               </box>
               <Show when={active().length <= 2 || tasksOpen()}>
-                <For each={active()}>
-                  {(session) => (
-                    // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
-                    <box flexDirection="row" gap={1} onMouseUp={() => openLogs(session)}>
-                      <text flexShrink={0} fg={ctx.theme.current.success}>
-                        •
-                      </text>
-                      <box flexDirection="column" flexGrow={1}>
-                        <text wrapMode="word" fg={ctx.theme.current.text}>
-                          {session.title}
-                        </text>
-                        <text fg={ctx.theme.current.textMuted}>
-                          {formatRunningTime(session.createdAt, now())}
-                        </text>
-                      </box>
-                    </box>
-                  )}
-                </For>
+                <For each={active()}>{(session) => <TaskRow session={session} />}</For>
               </Show>
             </box>
           </Show>
