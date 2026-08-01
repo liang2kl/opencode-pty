@@ -2,6 +2,10 @@ import type { PTYSession, PTYSessionInfo } from './types.ts'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import { NOTIFICATION_LINE_TRUNCATE, NOTIFICATION_TITLE_TRUNCATE } from '../constants.ts'
 
+function usesTmux(session: PTYSession | PTYSessionInfo): boolean {
+  return /\btmux\b/i.test([session.command, ...session.args].join(' '))
+}
+
 export class NotificationManager {
   private client: OpencodeClient | null = null
 
@@ -105,6 +109,12 @@ export class NotificationManager {
     } else {
       lines.push(
         'Process failed. Use pty_read with the pattern parameter to search for errors in the output.'
+      )
+    }
+
+    if (usesTmux(session)) {
+      lines.push(
+        'A tmux session may still be running; inspect and kill it manually if no longer needed.'
       )
     }
 

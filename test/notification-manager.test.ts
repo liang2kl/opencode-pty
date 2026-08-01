@@ -159,4 +159,38 @@ describe('NotificationManager', () => {
     expect(text).toContain('Timed Out: yes')
     expect(text).toContain('Process reached its PTY timeout and was stopped automatically.')
   })
+
+  it('warns when a command may leave a tmux session running', async () => {
+    const promptAsync = mock(async (_payload: PromptPayload) => {})
+    const manager = new NotificationManager()
+
+    manager.init({ session: { promptAsync } } as unknown as OpencodeClient)
+
+    await manager.sendExitNotification(
+      createSession({
+        command: 'ssh',
+        args: ['host', "tmux new-session -d -s build 'make'"],
+      }),
+      0
+    )
+
+    const payload = promptAsync.mock.calls[0]?.[0]
+    if (!payload) throw new Error('Expected a prompt payload')
+    expect(payload.body.parts[0]?.text).toContain(
+      'A tmux session may still be running; inspect and kill it manually if no longer needed.'
+    )
+  })
+
+  it('does not add a tmux warning to unrelated commands', async () => {
+    const promptAsync = mock(async (_payload: PromptPayload) => {})
+    const manager = new NotificationManager()
+
+    manager.init({ session: { promptAsync } } as unknown as OpencodeClient)
+
+    await manager.sendExitNotification(createSession({ command: 'make', args: ['test'] }), 0)
+
+    const payload = promptAsync.mock.calls[0]?.[0]
+    if (!payload) throw new Error('Expected a prompt payload')
+    expect(payload.body.parts[0]?.text).not.toContain('tmux session may still be running')
+  })
 })
