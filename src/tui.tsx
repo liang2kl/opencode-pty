@@ -17,6 +17,7 @@ import {
   PTY_RECONNECT_DELAY_MS,
   activeSessionsForParent,
   appendLog,
+  formatRunningTime,
   getPtyWebSocketUrl,
   removeSession,
   upsertSession,
@@ -32,6 +33,7 @@ const tui: TuiPlugin = async (api) => {
   const [sessions, setSessions] = createSignal<PTYSessionInfo[]>([])
   const [logs, setLogs] = createSignal<Record<string, string>>({})
   const [tasksOpen, setTasksOpen] = createSignal(true)
+  const [now, setNow] = createSignal(Date.now())
   const loadingLogs = new Set<string>()
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -178,8 +180,10 @@ const tui: TuiPlugin = async (api) => {
   }
 
   void connect()
+  const runtimeTimer = setInterval(() => setNow(Date.now()), 1000)
   api.lifecycle.onDispose(() => {
     if (reconnectTimer) clearTimeout(reconnectTimer)
+    clearInterval(runtimeTimer)
     socket?.close()
   })
 
@@ -208,13 +212,18 @@ const tui: TuiPlugin = async (api) => {
                 <For each={active()}>
                   {(session) => (
                     // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
-                    <box flexDirection="row" gap={0} onMouseUp={() => openLogs(session)}>
-                      <text flexShrink={0} fg={ctx.theme.current.warning}>
-                        [{session.status === 'running' ? '•' : ' '}]
+                    <box flexDirection="row" gap={1} onMouseUp={() => openLogs(session)}>
+                      <text flexShrink={0} fg={ctx.theme.current.success}>
+                        •
                       </text>
-                      <text flexGrow={1} wrapMode="word" fg={ctx.theme.current.textMuted}>
-                        {session.title}
-                      </text>
+                      <box flexDirection="column" flexGrow={1}>
+                        <text wrapMode="word" fg={ctx.theme.current.text}>
+                          {session.title}
+                        </text>
+                        <text fg={ctx.theme.current.textMuted}>
+                          {formatRunningTime(session.createdAt, now())}
+                        </text>
+                      </box>
                     </box>
                   )}
                 </For>

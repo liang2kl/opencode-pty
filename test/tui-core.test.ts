@@ -4,6 +4,7 @@ import {
   PTY_LOG_LIMIT,
   activeSessionsForParent,
   appendLog,
+  formatRunningTime,
   getPtyWebSocketUrl,
   removeSession,
   sameServerEndpoint,
@@ -75,6 +76,19 @@ describe('PTY TUI core', () => {
     const current = [session(), session({ id: 'pty_2' })]
 
     expect(removeSession(current, 'pty_1').map((item) => item.id)).toEqual(['pty_2'])
+  })
+
+  it('formats running time from the task start', () => {
+    const started = '2026-08-01T00:00:00.000Z'
+    expect(formatRunningTime(started, Date.parse('2026-08-01T00:00:42.000Z'))).toBe(
+      'Running for 42s'
+    )
+    expect(formatRunningTime(started, Date.parse('2026-08-01T00:02:05.000Z'))).toBe(
+      'Running for 2m 5s'
+    )
+    expect(formatRunningTime(started, Date.parse('2026-08-01T03:04:00.000Z'))).toBe(
+      'Running for 3h 4m'
+    )
   })
 
   it('bounds retained popup output', () => {
