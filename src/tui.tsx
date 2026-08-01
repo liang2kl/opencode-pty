@@ -60,8 +60,18 @@ const tui: TuiPlugin = async (api) => {
         const session = createMemo(
           () => sessions().find((item) => item.id === initial.id) ?? initial
         )
+        const dialogWidth = () => Math.max(1, Math.floor(api.renderer.width / 2))
+        const dialogHeight = () => Math.max(1, Math.floor(api.renderer.height / 2))
         return (
-          <box paddingLeft={2} paddingRight={2} paddingBottom={1} gap={1} flexDirection="column">
+          <box
+            width={dialogWidth()}
+            height={dialogHeight()}
+            paddingLeft={2}
+            paddingRight={2}
+            paddingBottom={1}
+            gap={1}
+            flexDirection="column"
+          >
             <box flexDirection="row" justifyContent="space-between">
               <text fg={api.theme.current.text}>
                 <b>{session().title}</b>
@@ -75,7 +85,7 @@ const tui: TuiPlugin = async (api) => {
               ref={(value: ScrollBoxRenderable) => {
                 setTimeout(() => value.scrollTo(value.scrollHeight), 0)
               }}
-              height={24}
+              flexGrow={1}
               stickyScroll
               stickyStart="bottom"
             >
