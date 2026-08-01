@@ -29,9 +29,9 @@ function plainOutput(data: string): string {
 const tui: TuiPlugin = async (api) => {
   const webSocketUrl = getPtyWebSocketUrl(process.env)
   const [connected, setConnected] = createSignal(false)
-  const [connectionError, setConnectionError] = createSignal<string>()
   const [sessions, setSessions] = createSignal<PTYSessionInfo[]>([])
   const [logs, setLogs] = createSignal<Record<string, string>>({})
+  const [tasksOpen, setTasksOpen] = createSignal(true)
   const loadingLogs = new Set<string>()
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -151,11 +151,9 @@ const tui: TuiPlugin = async (api) => {
       case 'server_info': {
         const response = message as WSMessageServerInfo
         if (response.protocol !== 1) {
-          setConnectionError('incompatible broker')
           socket?.close()
           break
         }
-        setConnectionError(undefined)
         setConnected(true)
         send({ type: 'session_list' })
         break
@@ -191,53 +189,38 @@ const tui: TuiPlugin = async (api) => {
       sidebar_content(ctx, value) {
         const active = createMemo(() => activeSessionsForParent(sessions(), value.session_id))
         return (
-          <box
-            border
-            borderColor={ctx.theme.current.border}
-            backgroundColor={ctx.theme.current.backgroundPanel}
-            paddingTop={1}
-            paddingBottom={1}
-            paddingLeft={2}
-            paddingRight={2}
-            flexDirection="column"
-            gap={1}
-          >
-            <box flexDirection="row" justifyContent="space-between">
-              <text fg={ctx.theme.current.primary}>
-                <b>PTY sessions</b>
-              </text>
-              <text fg={connected() ? ctx.theme.current.success : ctx.theme.current.warning}>
-                {connected() ? 'live' : (connectionError() ?? 'offline')}
-              </text>
-            </box>
-            <Show
-              when={webSocketUrl}
-              fallback={<text fg={ctx.theme.current.textMuted}>PTY broker unavailable</text>}
-            >
-              <Show
-                when={active().length > 0}
-                fallback={<text fg={ctx.theme.current.textMuted}>No running sessions</text>}
+          <Show when={webSocketUrl && active().length > 0}>
+            <box>
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements. */}
+              <box
+                flexDirection="row"
+                gap={1}
+                onMouseDown={() => active().length > 2 && setTasksOpen((open) => !open)}
               >
+                <Show when={active().length > 2}>
+                  <text fg={ctx.theme.current.text}>{tasksOpen() ? '▼' : '▶'}</text>
+                </Show>
+                <text fg={ctx.theme.current.text}>
+                  <b>Tasks</b>
+                </text>
+              </box>
+              <Show when={active().length <= 2 || tasksOpen()}>
                 <For each={active()}>
                   {(session) => (
                     // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes are not DOM elements.
-                    <box
-                      flexDirection="column"
-                      onMouseUp={() => openLogs(session)}
-                      backgroundColor={ctx.theme.current.backgroundElement}
-                      paddingLeft={1}
-                      paddingRight={1}
-                    >
-                      <text fg={ctx.theme.current.text}>{session.title}</text>
-                      <text fg={ctx.theme.current.textMuted}>
-                        {session.status} | pid {session.pid}
+                    <box flexDirection="row" gap={0} onMouseUp={() => openLogs(session)}>
+                      <text flexShrink={0} fg={ctx.theme.current.warning}>
+                        [{session.status === 'running' ? '•' : ' '}]
+                      </text>
+                      <text flexGrow={1} wrapMode="word" fg={ctx.theme.current.textMuted}>
+                        {session.title}
                       </text>
                     </box>
                   )}
                 </For>
               </Show>
-            </Show>
-          </box>
+            </box>
+          </Show>
         )
       },
     },
