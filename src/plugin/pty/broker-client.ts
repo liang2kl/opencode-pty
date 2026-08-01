@@ -137,7 +137,7 @@ export class BrokerClient implements Disposable {
           return
         }
         if (message.type === 'session_exit') {
-          if (message.ownerId !== this.ownerId) return
+          if (message.ownerId && message.ownerId !== this.ownerId) return
           void this.notifications.sendExitNotification(
             message.session,
             message.exitCode,
