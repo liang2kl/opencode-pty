@@ -1,5 +1,5 @@
 import { tool } from '@opencode-ai/plugin'
-import { getBrokerClient } from '../broker-client.ts'
+import type { BrokerTransport } from '../../../broker/protocol.ts'
 import type { PTYSessionInfo } from '../types.ts'
 import { checkCommandPermission } from '../permissions.ts'
 import { buildSessionNotFoundError } from '../utils.ts'
@@ -54,45 +54,49 @@ function parseCommand(commandLine: string): { command: string; args: string[] } 
   return { command, args }
 }
 
-export const ptyWrite = tool({
-  description: DESCRIPTION,
-  args: {
-    id: tool.schema.string().describe('The PTY session ID (e.g., pty_a1b2c3d4)'),
-    data: tool.schema.string().describe('The input data to send to the PTY'),
-  },
-  async execute(args) {
-    const broker = getBrokerClient()
-    const session = await broker.request<PTYSessionInfo | null>({ type: 'get', id: args.id })
-    if (!session) {
-      throw buildSessionNotFoundError(args.id)
-    }
-
-    if (session.status !== 'running') {
-      throw new Error(`Cannot write to PTY '${args.id}' - session status is '${session.status}'.`)
-    }
-
-    // Parse escape sequences to actual bytes
-    const parsedData = parseEscapeSequences(args.data)
-
-    const commands = extractCommands(parsedData)
-    for (const commandLine of commands) {
-      const { command, args: cmdArgs } = parseCommand(commandLine)
-      if (command) {
-        await checkCommandPermission(command, cmdArgs)
+export const createPtyWrite = (broker: BrokerTransport) =>
+  tool({
+    description: DESCRIPTION,
+    args: {
+      id: tool.schema.string().describe('The PTY session ID (e.g., pty_a1b2c3d4)'),
+      data: tool.schema.string().describe('The input data to send to the PTY'),
+    },
+    async execute(args) {
+      const session = await broker.request<PTYSessionInfo | null>({ type: 'get', id: args.id })
+      if (!session) {
+        throw buildSessionNotFoundError(args.id)
       }
-    }
 
-    const success = await broker.request<boolean>({ type: 'write', id: args.id, data: parsedData })
-    if (!success) {
-      throw new Error(`Failed to write to PTY '${args.id}'.`)
-    }
+      if (session.status !== 'running') {
+        throw new Error(`Cannot write to PTY '${args.id}' - session status is '${session.status}'.`)
+      }
 
-    const preview = args.data.length > 50 ? `${args.data.slice(0, 50)}...` : args.data
-    const displayPreview = preview
-      .replace(new RegExp(ETX, 'g'), '^C')
-      .replace(new RegExp(EOT, 'g'), '^D')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-    return `Sent ${args.data.length} bytes to ${args.id}: "${displayPreview}"`
-  },
-})
+      // Parse escape sequences to actual bytes
+      const parsedData = parseEscapeSequences(args.data)
+
+      const commands = extractCommands(parsedData)
+      for (const commandLine of commands) {
+        const { command, args: cmdArgs } = parseCommand(commandLine)
+        if (command) {
+          await checkCommandPermission(command, cmdArgs)
+        }
+      }
+
+      const success = await broker.request<boolean>({
+        type: 'write',
+        id: args.id,
+        data: parsedData,
+      })
+      if (!success) {
+        throw new Error(`Failed to write to PTY '${args.id}'.`)
+      }
+
+      const preview = args.data.length > 50 ? `${args.data.slice(0, 50)}...` : args.data
+      const displayPreview = preview
+        .replace(new RegExp(ETX, 'g'), '^C')
+        .replace(new RegExp(EOT, 'g'), '^D')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+      return `Sent ${args.data.length} bytes to ${args.id}: "${displayPreview}"`
+    },
+  })

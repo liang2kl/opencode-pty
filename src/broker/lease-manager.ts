@@ -72,7 +72,13 @@ export class LeaseManager implements Disposable {
     exitCode: number,
     lastLine: string
   ): void => {
-    const message: BrokerExitMessage = { type: 'session_exit', session, exitCode, lastLine }
+    const message: BrokerExitMessage = {
+      type: 'session_exit',
+      ownerId,
+      session,
+      exitCode,
+      lastLine,
+    }
     const socket = this.owners.get(ownerId)
     if (!socket) {
       if (this.cleanupTimers.has(ownerId)) {

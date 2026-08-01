@@ -1,14 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
-import { ptySpawn } from '../src/plugin/pty/tools/spawn.ts'
+import { createPtySpawn } from '../src/plugin/pty/tools/spawn.ts'
 import { manager, registerRawOutputCallback } from '../src/plugin/pty/manager.ts'
 import { ManagedTestServer } from './utils.ts'
 
 describe('ptySpawn Integration', () => {
   let managedTestServer: ManagedTestServer
   let disposableStack: DisposableStack
+  let ptySpawn: ReturnType<typeof createPtySpawn>
 
   beforeAll(async () => {
     managedTestServer = await ManagedTestServer.create()
+    ptySpawn = createPtySpawn(managedTestServer.broker)
     disposableStack = new DisposableStack()
     disposableStack.use(managedTestServer)
   })

@@ -3,6 +3,7 @@
 import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
 import type { ScrollBoxRenderable } from '@opentui/core'
 import { For, Show, createMemo, createSignal } from 'solid-js'
+import { BROKER_PROTOCOL_VERSION } from './broker/protocol.ts'
 import type { PTYSessionInfo } from './plugin/pty/types.ts'
 import type {
   WSMessageServer,
@@ -77,17 +78,14 @@ const tui: TuiPlugin = async (api) => {
     send({ type: 'subscribe', sessionId: initial.id })
     send({ type: 'readRaw', sessionId: initial.id })
 
-    api.ui.dialog.setSize('xlarge')
     api.ui.dialog.replace(
       () => {
         const session = createMemo(
           () => sessions().find((item) => item.id === initial.id) ?? initial
         )
-        const dialogWidth = () => Math.max(1, Math.floor(api.renderer.width / 2))
         const dialogHeight = () => Math.max(1, Math.floor(api.renderer.height / 2))
         return (
           <box
-            width={dialogWidth()}
             height={dialogHeight()}
             paddingLeft={2}
             paddingRight={2}
@@ -125,6 +123,7 @@ const tui: TuiPlugin = async (api) => {
         send({ type: 'unsubscribe', sessionId: initial.id })
       }
     )
+    api.ui.dialog.setSize('xlarge')
   }
 
   const handleMessage = (event: MessageEvent) => {
@@ -185,7 +184,7 @@ const tui: TuiPlugin = async (api) => {
       }
       case 'server_info': {
         const response = message as WSMessageServerInfo
-        if (response.protocol !== 1) {
+        if (response.protocol !== BROKER_PROTOCOL_VERSION) {
           socket?.close()
           break
         }

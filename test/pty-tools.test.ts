@@ -1,47 +1,81 @@
 import { describe, it, expect, beforeEach, mock, spyOn, afterAll } from 'bun:test'
-import { ptySpawn } from '../src/plugin/pty/tools/spawn.ts'
-import { ptyRead } from '../src/plugin/pty/tools/read.ts'
-import { ptyList } from '../src/plugin/pty/tools/list.ts'
+import type { BrokerTransport } from '../src/broker/protocol.ts'
+import { createPtySpawn } from '../src/plugin/pty/tools/spawn.ts'
+import { createPtyRead } from '../src/plugin/pty/tools/read.ts'
+import { createPtyList } from '../src/plugin/pty/tools/list.ts'
 import { RingBuffer } from '../src/plugin/pty/buffer.ts'
 import { manager } from '../src/plugin/pty/manager.ts'
-import { setBrokerClient } from '../src/plugin/pty/broker-client.ts'
+
+const broker: BrokerTransport = {
+  async request(operation) {
+    switch (operation.type) {
+      case 'spawn':
+        return manager.spawn(operation.options) as never
+      case 'get':
+        return manager.get(operation.id) as never
+      case 'list':
+        return manager.list() as never
+      case 'write':
+        return manager.write(operation.id, operation.data) as never
+      case 'read':
+        return manager.read(operation.id, operation.offset, operation.limit) as never
+      case 'search':
+        return manager.search(
+          operation.id,
+          new RegExp(operation.pattern, operation.flags),
+          operation.offset,
+          operation.limit
+        ) as never
+      case 'kill':
+        return manager.kill(operation.id, operation.cleanup) as never
+      case 'cleanupBySession':
+        manager.cleanupBySession(operation.parentSessionId)
+        return true as never
+    }
+  },
+}
+
+const ptySpawn = createPtySpawn(broker)
+const ptyRead = createPtyRead(broker)
+const ptyList = createPtyList(broker)
 
 describe('PTY Tools', () => {
-  beforeEach(() => {
-    setBrokerClient({
-      async request(operation) {
-        switch (operation.type) {
-          case 'spawn':
-            return manager.spawn(operation.options) as never
-          case 'get':
-            return manager.get(operation.id) as never
-          case 'list':
-            return manager.list() as never
-          case 'write':
-            return manager.write(operation.id, operation.data) as never
-          case 'read':
-            return manager.read(operation.id, operation.offset, operation.limit) as never
-          case 'search':
-            return manager.search(
-              operation.id,
-              new RegExp(operation.pattern, operation.flags),
-              operation.offset,
-              operation.limit
-            ) as never
-          case 'kill':
-            return manager.kill(operation.id, operation.cleanup) as never
-          case 'cleanupBySession':
-            manager.cleanupBySession(operation.parentSessionId)
-            return true as never
-        }
-      },
-    })
-  })
-
   afterAll(() => {
-    setBrokerClient(undefined)
     mock.restore()
   })
+
+  it('keeps tool transports isolated between plugin instances', async () => {
+    const first = createPtyList({
+      async request() {
+        return [] as never
+      },
+    })
+    const second = createPtyList({
+      async request() {
+        return [
+          {
+            id: 'second-owner-session',
+            parentSessionId: 'shared-session',
+            title: 'Second owner',
+            command: 'sleep',
+            args: ['1'],
+            status: 'running' as const,
+            notifyOnExit: true,
+            timeoutSeconds: undefined,
+            timedOut: false,
+            pid: 123,
+            lineCount: 0,
+            workdir: '/tmp',
+            createdAt: new Date().toISOString(),
+          },
+        ] as never
+      },
+    })
+
+    expect(await first.execute({}, {} as never)).toContain('No active PTY sessions')
+    expect(await second.execute({}, {} as never)).toContain('second-owner-session')
+  })
+
   describe('ptySpawn', () => {
     beforeEach(() => {
       spyOn(manager, 'spawn').mockImplementation((opts) => ({

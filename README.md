@@ -127,6 +127,9 @@ export PTY_WEB_PORT=4097
 The sidebar displays only running PTYs owned by the current OpenCode session, with a live duration
 for each task and a compact clickable log view. Each OpenCode process holds a broker lease: when
 that process exits, the broker kills and removes only its PTYs.
+Exit notifications are routed to the lease that invoked `pty_spawn`, even when multiple OpenCode
+processes are attached to the same session. The resulting session message remains visible in every
+UI attached to that shared session, but only the spawning process injects it.
 Other OpenCode processes and their PTYs continue running. When the final process exits, the broker
 kills any remaining sessions and shuts itself down.
 

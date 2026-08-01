@@ -7,7 +7,7 @@ import {
   rawOutputCallbacks,
 } from '../src/plugin/pty/manager'
 import { PTYServer } from '../src/web/server/server'
-import { setBrokerClient } from '../src/plugin/pty/broker-client'
+import type { BrokerTransport } from '../src/broker/protocol'
 import type {
   WSMessageServer,
   WSMessageServerSubscribedSession,
@@ -160,6 +160,7 @@ export class ManagedTestClient implements Disposable {
 
 export class ManagedTestServer implements Disposable {
   public readonly server: PTYServer
+  public readonly broker: BrokerTransport
   private readonly stack = new DisposableStack()
   public readonly sessionId: string
 
@@ -173,7 +174,7 @@ export class ManagedTestServer implements Disposable {
     const client = new OpencodeClient()
     initManager(client)
     this.server = server
-    setBrokerClient({
+    this.broker = {
       async request(operation) {
         switch (operation.type) {
           case 'spawn':
@@ -200,12 +201,11 @@ export class ManagedTestServer implements Disposable {
             return true as never
         }
       },
-    })
+    }
     this.stack.use(this.server)
     this.sessionId = crypto.randomUUID()
   }
   [Symbol.dispose]() {
-    setBrokerClient(undefined)
     this.stack.dispose()
     manager.clearAllSessions()
     sessionUpdateCallbacks.length = 0

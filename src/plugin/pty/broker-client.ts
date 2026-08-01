@@ -124,12 +124,20 @@ export class BrokerClient implements Disposable {
         const message = JSON.parse(event.data) as BrokerReadyMessage | BrokerExitMessage
         if (message.type === 'owner_ready') {
           if (settled) return
+          if (message.ownerId !== this.ownerId || message.protocol !== BROKER_PROTOCOL_VERSION) {
+            settled = true
+            clearTimeout(timeout)
+            socket.close(1002, 'invalid broker identity')
+            reject(new Error('PTY broker returned an invalid lease identity'))
+            return
+          }
           settled = true
           clearTimeout(timeout)
           resolve()
           return
         }
         if (message.type === 'session_exit') {
+          if (message.ownerId !== this.ownerId) return
           void this.notifications.sendExitNotification(
             message.session,
             message.exitCode,
@@ -189,17 +197,4 @@ export class BrokerClient implements Disposable {
     this.socket?.close(1000, 'plugin disposed')
     this.socket = undefined
   }
-}
-
-type BrokerTransport = Pick<BrokerClient, 'request'>
-
-let activeBroker: BrokerTransport | undefined
-
-export function setBrokerClient(client: BrokerTransport | undefined): void {
-  activeBroker = client
-}
-
-export function getBrokerClient(): BrokerTransport {
-  if (!activeBroker) throw new Error('PTY broker is not connected')
-  return activeBroker
 }

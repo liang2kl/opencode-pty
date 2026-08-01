@@ -110,6 +110,41 @@ describe('shared broker leases', () => {
 
     const replayed: string[] = []
     leases.add('owner', fakeSocket(replayed))
-    expect(replayed.some((message) => JSON.parse(message).type === 'session_exit')).toBe(true)
+    const exit = replayed
+      .map((message) => JSON.parse(message))
+      .find((message) => message.type === 'session_exit')
+    expect(exit).toEqual(expect.objectContaining({ ownerId: 'owner' }))
+  })
+
+  it('routes same-session exit notifications only to the spawning owner', async () => {
+    using leases = new LeaseManager(false, () => {})
+    const firstMessages: string[] = []
+    const secondMessages: string[] = []
+    leases.add('first', fakeSocket(firstMessages))
+    leases.add('second', fakeSocket(secondMessages))
+
+    manager.spawnOwned('first', {
+      command: '/bin/sh',
+      args: ['-c', 'exit 0'],
+      parentSessionId: 'shared-session',
+      notifyOnExit: true,
+    })
+
+    await Bun.sleep(200)
+
+    const firstExits = firstMessages
+      .map((message) => JSON.parse(message))
+      .filter((message) => message.type === 'session_exit')
+    const secondExits = secondMessages
+      .map((message) => JSON.parse(message))
+      .filter((message) => message.type === 'session_exit')
+    expect(firstExits).toHaveLength(1)
+    expect(firstExits[0]).toEqual(
+      expect.objectContaining({
+        ownerId: 'first',
+        session: expect.objectContaining({ parentSessionId: 'shared-session' }),
+      })
+    )
+    expect(secondExits).toHaveLength(0)
   })
 })

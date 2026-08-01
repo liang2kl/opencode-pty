@@ -1,5 +1,5 @@
 import { tool } from '@opencode-ai/plugin'
-import { getBrokerClient } from '../broker-client.ts'
+import type { BrokerTransport } from '../../../broker/protocol.ts'
 import { DEFAULT_READ_LIMIT, MAX_LINE_LENGTH } from '../../../shared/constants.ts'
 import { buildSessionNotFoundError } from '../utils.ts'
 import { formatLine } from '../formatters.ts'
@@ -97,6 +97,7 @@ function validateAndCreateRegex(pattern: string, ignoreCase?: boolean): RegExp {
  * Handles pattern-based reading and formatting
  */
 async function handlePatternRead(
+  broker: BrokerTransport,
   id: string,
   pattern: string,
   ignoreCase: boolean | undefined,
@@ -106,7 +107,7 @@ async function handlePatternRead(
 ): Promise<string> {
   const regex = validateAndCreateRegex(pattern, ignoreCase)
 
-  const result = await getBrokerClient().request<SearchResult | null>({
+  const result = await broker.request<SearchResult | null>({
     type: 'search',
     id,
     pattern: regex.source,
@@ -155,12 +156,13 @@ async function handlePatternRead(
  * Handles plain reading and formatting
  */
 async function handlePlainRead(
+  broker: BrokerTransport,
   args: ReadArgs,
   session: PTYSessionInfo,
   offset: number,
   limit: number
 ): Promise<string> {
-  const result = await getBrokerClient().request<ReadResult | null>({
+  const result = await broker.request<ReadResult | null>({
     type: 'read',
     id: args.id,
     offset,
@@ -222,49 +224,58 @@ function validateRegex(pattern: string): boolean {
   }
 }
 
-export const ptyRead = tool({
-  description: DESCRIPTION,
-  args: {
-    id: tool.schema.string().describe('The PTY session ID (e.g., pty_a1b2c3d4)'),
-    offset: tool.schema
-      .number()
-      .optional()
-      .describe(
-        'Line number to start reading from (0-based, defaults to 0). When using pattern, this applies to filtered matches.'
-      ),
-    limit: tool.schema
-      .number()
-      .optional()
-      .describe(
-        'Number of lines to read (defaults to 500). When using pattern, this applies to filtered matches.'
-      ),
-    pattern: tool.schema
-      .string()
-      .optional()
-      .describe(
-        'Regex pattern to filter lines. When set, only matching lines are returned, then offset/limit apply to the matches.'
-      ),
-    ignoreCase: tool.schema
-      .boolean()
-      .optional()
-      .describe('Case-insensitive pattern matching (default: false)'),
-  },
-  async execute(args) {
-    const session = await getBrokerClient().request<PTYSessionInfo | null>({
-      type: 'get',
-      id: args.id,
-    })
-    if (!session) {
-      throw buildSessionNotFoundError(args.id)
-    }
+export const createPtyRead = (broker: BrokerTransport) =>
+  tool({
+    description: DESCRIPTION,
+    args: {
+      id: tool.schema.string().describe('The PTY session ID (e.g., pty_a1b2c3d4)'),
+      offset: tool.schema
+        .number()
+        .optional()
+        .describe(
+          'Line number to start reading from (0-based, defaults to 0). When using pattern, this applies to filtered matches.'
+        ),
+      limit: tool.schema
+        .number()
+        .optional()
+        .describe(
+          'Number of lines to read (defaults to 500). When using pattern, this applies to filtered matches.'
+        ),
+      pattern: tool.schema
+        .string()
+        .optional()
+        .describe(
+          'Regex pattern to filter lines. When set, only matching lines are returned, then offset/limit apply to the matches.'
+        ),
+      ignoreCase: tool.schema
+        .boolean()
+        .optional()
+        .describe('Case-insensitive pattern matching (default: false)'),
+    },
+    async execute(args) {
+      const session = await broker.request<PTYSessionInfo | null>({
+        type: 'get',
+        id: args.id,
+      })
+      if (!session) {
+        throw buildSessionNotFoundError(args.id)
+      }
 
-    const offset = args.offset ?? 0
-    const limit = args.limit ?? DEFAULT_READ_LIMIT
+      const offset = args.offset ?? 0
+      const limit = args.limit ?? DEFAULT_READ_LIMIT
 
-    if (args.pattern) {
-      return await handlePatternRead(args.id, args.pattern, args.ignoreCase, session, offset, limit)
-    } else {
-      return await handlePlainRead(args, session, offset, limit)
-    }
-  },
-})
+      if (args.pattern) {
+        return await handlePatternRead(
+          broker,
+          args.id,
+          args.pattern,
+          args.ignoreCase,
+          session,
+          offset,
+          limit
+        )
+      } else {
+        return await handlePlainRead(broker, args, session, offset, limit)
+      }
+    },
+  })

@@ -1,12 +1,12 @@
 import type { PluginContext, PluginResult } from './plugin/types.ts'
 import { initPermissions } from './plugin/pty/permissions.ts'
-import { BrokerClient, setBrokerClient } from './plugin/pty/broker-client.ts'
-import type { BrokerOperation, BrokerResult } from './broker/protocol.ts'
-import { ptySpawn } from './plugin/pty/tools/spawn.ts'
-import { ptyWrite } from './plugin/pty/tools/write.ts'
-import { ptyRead } from './plugin/pty/tools/read.ts'
-import { ptyList } from './plugin/pty/tools/list.ts'
-import { ptyKill } from './plugin/pty/tools/kill.ts'
+import { BrokerClient } from './plugin/pty/broker-client.ts'
+import type { BrokerOperation, BrokerResult, BrokerTransport } from './broker/protocol.ts'
+import { createPtySpawn } from './plugin/pty/tools/spawn.ts'
+import { createPtyWrite } from './plugin/pty/tools/write.ts'
+import { createPtyRead } from './plugin/pty/tools/read.ts'
+import { createPtyList } from './plugin/pty/tools/list.ts'
+import { createPtyKill } from './plugin/pty/tools/kill.ts'
 import open from 'open'
 
 const ptyOpenClientCommand = 'pty-open-background-spy'
@@ -29,7 +29,6 @@ export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<P
           return undefined
         }
         broker = connected
-        setBrokerClient(connected)
         return connected
       })
       .catch((error) => {
@@ -49,18 +48,17 @@ export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<P
   }
 
   await connectBroker()
-  setBrokerClient({
+  const transport: BrokerTransport = {
     async request<T extends BrokerResult>(operation: BrokerOperation): Promise<T> {
       const activeBroker = await connectBroker()
       if (!activeBroker) throw new Error('PTY broker is unavailable')
       return activeBroker.request<T>(operation)
     },
-  })
+  }
 
   return {
     dispose: async () => {
       disposed = true
-      setBrokerClient(undefined)
       broker?.[Symbol.dispose]()
     },
     'command.execute.before': async (input) => {
@@ -78,11 +76,11 @@ export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<P
       throw new Error('Command handled by PTY plugin')
     },
     tool: {
-      pty_spawn: ptySpawn,
-      pty_write: ptyWrite,
-      pty_read: ptyRead,
-      pty_list: ptyList,
-      pty_kill: ptyKill,
+      pty_spawn: createPtySpawn(transport),
+      pty_write: createPtyWrite(transport),
+      pty_read: createPtyRead(transport),
+      pty_list: createPtyList(transport),
+      pty_kill: createPtyKill(transport),
     },
     config: async (input) => {
       if (!input.command) {
