@@ -2,7 +2,7 @@
 
 import type { TuiPlugin, TuiPluginModule } from '@opencode-ai/plugin/tui'
 import type { ScrollBoxRenderable } from '@opentui/core'
-import { For, Show, createMemo, createSignal } from 'solid-js'
+import { For, Show, createMemo, createSignal, onCleanup } from 'solid-js'
 import type { PTYSessionInfo } from './plugin/pty/types.ts'
 import type {
   WSMessageServer,
@@ -33,13 +33,18 @@ const tui: TuiPlugin = async (api) => {
   const [sessions, setSessions] = createSignal<PTYSessionInfo[]>([])
   const [logs, setLogs] = createSignal<Record<string, string>>({})
   const [tasksOpen, setTasksOpen] = createSignal(true)
-  const [now, setNow] = createSignal(Date.now())
   const loadingLogs = new Set<string>()
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let activeLogSessionId: string | undefined
 
   const TaskRow = (props: { session: PTYSessionInfo }) => {
+    const [now, setNow] = createSignal(Date.now())
+    const timer = setInterval(() => {
+      setNow(Date.now())
+      api.renderer.requestRender()
+    }, 1000)
+    onCleanup(() => clearInterval(timer))
     const duration = createMemo(() => formatRunningTime(props.session.createdAt, now()))
     const showActivity = createMemo(() => Math.floor(now() / 1000) % 2 === 0)
 
@@ -60,11 +65,6 @@ const tui: TuiPlugin = async (api) => {
       </box>
     )
   }
-
-  const activityTimer = setInterval(() => {
-    setNow(Date.now())
-    api.renderer.requestRender()
-  }, 1000)
 
   const send = (message: object) => {
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
@@ -208,7 +208,6 @@ const tui: TuiPlugin = async (api) => {
 
   void connect()
   api.lifecycle.onDispose(() => {
-    clearInterval(activityTimer)
     if (reconnectTimer) clearTimeout(reconnectTimer)
     socket?.close()
   })
