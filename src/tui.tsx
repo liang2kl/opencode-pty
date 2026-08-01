@@ -19,7 +19,6 @@ import {
   appendLog,
   getPtyWebSocketUrl,
   removeSession,
-  sameServerEndpoint,
   upsertSession,
 } from './tui/core.ts'
 
@@ -37,7 +36,6 @@ const tui: TuiPlugin = async (api) => {
   let socket: WebSocket | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let activeLogSessionId: string | undefined
-  let expectedOwner: string | undefined
 
   const send = (message: object) => {
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
@@ -152,8 +150,8 @@ const tui: TuiPlugin = async (api) => {
       }
       case 'server_info': {
         const response = message as WSMessageServerInfo
-        if (expectedOwner && !sameServerEndpoint(expectedOwner, response.owner)) {
-          setConnectionError('wrong backend')
+        if (response.protocol !== 1) {
+          setConnectionError('incompatible broker')
           socket?.close()
           break
         }
@@ -167,18 +165,6 @@ const tui: TuiPlugin = async (api) => {
 
   const connect = async () => {
     if (!webSocketUrl || api.lifecycle.signal.aborted) return
-    if (!expectedOwner) {
-      try {
-        const result = await api.client.global.health()
-        if (!result.response?.url) throw new Error('OpenCode health response has no URL')
-        expectedOwner = new URL(result.response.url).origin
-      } catch {
-        setConnectionError('backend unavailable')
-        reconnectTimer = setTimeout(() => void connect(), PTY_RECONNECT_DELAY_MS)
-        return
-      }
-    }
-    if (api.lifecycle.signal.aborted) return
     const next = new WebSocket(webSocketUrl)
     socket = next
     next.onmessage = handleMessage
@@ -226,7 +212,7 @@ const tui: TuiPlugin = async (api) => {
             </box>
             <Show
               when={webSocketUrl}
-              fallback={<text fg={ctx.theme.current.textMuted}>Set PTY_WEB_PORT to enable</text>}
+              fallback={<text fg={ctx.theme.current.textMuted}>PTY broker unavailable</text>}
             >
               <Show
                 when={active().length > 0}

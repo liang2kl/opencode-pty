@@ -4,10 +4,10 @@ export const PTY_RECONNECT_DELAY_MS = 1000
 export const PTY_LOG_LIMIT = 200_000
 
 export function getPtyWebSocketUrl(env: Record<string, string | undefined>): string | undefined {
-  const port = Number(env.PTY_WEB_PORT)
+  const port = Number(env.PTY_WEB_PORT ?? '4097')
   if (!Number.isInteger(port) || port < 1 || port > 65_535) return
 
-  const rawHostname = env.PTY_WEB_HOSTNAME ?? '::1'
+  const rawHostname = env.PTY_WEB_HOSTNAME ?? '127.0.0.1'
   const hostname =
     rawHostname.includes(':') && !rawHostname.startsWith('[') ? `[${rawHostname}]` : rawHostname
   return `ws://${hostname}:${port}/ws`

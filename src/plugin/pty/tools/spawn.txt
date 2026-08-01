@@ -5,6 +5,7 @@ Unlike the built-in bash tool which runs commands synchronously and waits for co
 - Send interactive input (including Ctrl+C, arrow keys, etc.)
 - Read output at any time
 - Manage multiple concurrent terminal sessions
+- Share one detached PTY broker with other OpenCode processes while keeping process ownership isolated
 
 Usage:
 - The `command` parameter is required (e.g., "npm", "python", "bash")
@@ -15,6 +16,7 @@ Usage:
 - The `description` parameter is required: a clear, concise 5-10 word description
 - Use `notifyOnExit` to receive a notification when the process exits (default: false)
 - Use `timeoutSeconds` to auto-kill the PTY after a fixed number of seconds
+- Sessions are killed automatically when their owning OpenCode process exits; other processes' sessions continue running
 - Do not set `timeoutSeconds` by default for sessions that are meant to keep running, such as dev servers, watch modes, local APIs, or REPLs. Only add a timeout for those when the user explicitly asks for one.
 - Prefer setting `timeoutSeconds` for long-running commands that are still expected to finish on their own, such as builds, unit test suites, end-to-end tests, migrations, or other commands where you are waiting for a result.
 

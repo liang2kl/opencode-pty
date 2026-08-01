@@ -67,7 +67,7 @@ export class SessionLifecycleManager {
     this.sessionTimeouts.set(session.id, timeoutHandle)
   }
 
-  private createSessionObject(opts: SpawnOptions): PTYSession {
+  private createSessionObject(ownerId: string, opts: SpawnOptions): PTYSession {
     const id = generateId()
     const args = opts.args ?? []
     const workdir = opts.workdir ?? process.cwd()
@@ -78,6 +78,7 @@ export class SessionLifecycleManager {
     const buffer = new RingBuffer()
     return {
       id,
+      ownerId,
       title,
       description: opts.description,
       command: opts.command,
@@ -138,11 +139,12 @@ export class SessionLifecycleManager {
   }
 
   spawn(
+    ownerId: string,
     opts: SpawnOptions,
     onData: (session: PTYSession, data: string) => void,
     onExit: (session: PTYSession, exitCode: number | null) => void
   ): PTYSessionInfo {
-    const session = this.createSessionObject(opts)
+    const session = this.createSessionObject(ownerId, opts)
     this.spawnProcess(session)
     this.setupEventHandlers(session, onData, onExit)
     this.sessions.set(session.id, session)
@@ -205,6 +207,7 @@ export class SessionLifecycleManager {
     return {
       id: session.id,
       parentSessionId: session.parentSessionId,
+      parentAgent: session.parentAgent,
       title: session.title,
       description: session.description,
       command: session.command,

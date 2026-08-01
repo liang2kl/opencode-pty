@@ -5,6 +5,7 @@ export type PTYStatus = 'running' | 'exited' | 'killing' | 'killed'
 
 export interface PTYSession {
   id: string
+  ownerId: string
   title: string
   description?: string
   command: string
@@ -28,6 +29,7 @@ export interface PTYSession {
 export interface PTYSessionInfo {
   id: string
   parentSessionId: string
+  parentAgent?: string
   title: string
   description?: string
   command: string

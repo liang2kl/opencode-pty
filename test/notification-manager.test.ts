@@ -20,6 +20,7 @@ function createSession(overrides: Partial<PTYSession> = {}): PTYSession {
 
   return {
     id: 'pty_test',
+    ownerId: 'test-owner',
     title: 'Test Session',
     description: 'Test session description',
     command: 'echo',

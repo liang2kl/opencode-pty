@@ -104,7 +104,7 @@ export interface WSMessageServerSessionRemoved extends WSMessageServer {
 
 export interface WSMessageServerInfo extends WSMessageServer {
   type: 'server_info'
-  owner: string
+  protocol: number
 }
 
 export interface WSMessageServerError extends WSMessageServer {
@@ -118,6 +118,7 @@ interface HealthResponse {
   uptime: number
   sessions: { total: number; active: number }
   websocket: { connections: number }
+  broker?: { protocol: number; owners: number }
   memory?: { rss: number; heapUsed: number; heapTotal: number }
   responseTime?: number
 }

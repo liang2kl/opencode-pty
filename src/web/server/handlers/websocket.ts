@@ -18,14 +18,14 @@ import {
 } from '../../shared/types'
 
 class WebSocketHandler {
-  private sendSessionList(ws: ServerWebSocket<undefined>): void {
+  private sendSessionList(ws: ServerWebSocket<unknown>): void {
     const sessions = manager.list()
     const message: WSMessageServerSessionList = { type: 'session_list', sessions }
     ws.send(JSON.stringify(message))
   }
 
   private handleSubscribe(
-    ws: ServerWebSocket<undefined>,
+    ws: ServerWebSocket<unknown>,
     message: WSMessageClientSubscribeSession
   ): void {
     const session = manager.get(message.sessionId)
@@ -46,7 +46,7 @@ class WebSocketHandler {
   }
 
   private handleUnsubscribe(
-    ws: ServerWebSocket<undefined>,
+    ws: ServerWebSocket<unknown>,
     message: WSMessageClientUnsubscribeSession
   ): void {
     const topic = `session:${message.sessionId}`
@@ -59,13 +59,13 @@ class WebSocketHandler {
   }
 
   private handleSessionListRequest(
-    ws: ServerWebSocket<undefined>,
+    ws: ServerWebSocket<unknown>,
     _message: WSMessageClientSessionList
   ): void {
     this.sendSessionList(ws)
   }
 
-  private handleUnknownMessage(ws: ServerWebSocket<undefined>, message: WSMessageClient): void {
+  private handleUnknownMessage(ws: ServerWebSocket<unknown>, message: WSMessageClient): void {
     const error: WSMessageServerError = {
       type: 'error',
       error: new CustomError(`Unknown message type ${message.type}`),
@@ -74,7 +74,7 @@ class WebSocketHandler {
   }
 
   public handleWebSocketMessage(
-    ws: ServerWebSocket<undefined>,
+    ws: ServerWebSocket<unknown>,
     data: string | Buffer<ArrayBuffer>
   ): void {
     if (typeof data !== 'string') {
@@ -125,14 +125,14 @@ class WebSocketHandler {
     }
   }
 
-  private async handleSpawn(ws: ServerWebSocket<undefined>, message: WSMessageClientSpawnSession) {
+  private async handleSpawn(ws: ServerWebSocket<unknown>, message: WSMessageClientSpawnSession) {
     try {
       await checkCommandPermission(message.command, message.args ?? [])
       if (message.workdir) {
         await checkWorkdirPermission(message.workdir)
       }
 
-      const sessionInfo = manager.spawn(message)
+      const sessionInfo = manager.spawnOwned('web-api', message)
       if (message.subscribe) {
         this.handleSubscribe(ws, { type: 'subscribe', sessionId: sessionInfo.id })
       }
@@ -149,7 +149,7 @@ class WebSocketHandler {
     manager.write(message.sessionId, message.data)
   }
 
-  private handleReadRaw(ws: ServerWebSocket<undefined>, message: WSMessageClientReadRaw) {
+  private handleReadRaw(ws: ServerWebSocket<unknown>, message: WSMessageClientReadRaw) {
     const rawData = manager.getRawBuffer(message.sessionId)
     if (!rawData) {
       const error: WSMessageServerError = {
@@ -169,7 +169,7 @@ class WebSocketHandler {
 }
 
 export function handleWebSocketMessage(
-  ws: ServerWebSocket<undefined>,
+  ws: ServerWebSocket<unknown>,
   data: string | Buffer<ArrayBuffer>
 ): void {
   const handler = new WebSocketHandler()

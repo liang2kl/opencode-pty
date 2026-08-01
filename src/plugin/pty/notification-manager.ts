@@ -1,4 +1,4 @@
-import type { PTYSession } from './types.ts'
+import type { PTYSession, PTYSessionInfo } from './types.ts'
 import type { OpencodeClient } from '@opencode-ai/sdk'
 import { NOTIFICATION_LINE_TRUNCATE, NOTIFICATION_TITLE_TRUNCATE } from '../constants.ts'
 
@@ -9,13 +9,17 @@ export class NotificationManager {
     this.client = client
   }
 
-  async sendExitNotification(session: PTYSession, exitCode: number): Promise<void> {
+  async sendExitNotification(
+    session: PTYSession | PTYSessionInfo,
+    exitCode: number,
+    brokerLastLine?: string
+  ): Promise<void> {
     if (!this.client) {
       return
     }
 
     try {
-      const message = this.buildExitNotification(session, exitCode)
+      const message = this.buildExitNotification(session, exitCode, brokerLastLine)
       let modelContext: {
         model?: { providerID: string; modelID: string }
         variant?: string
@@ -53,21 +57,24 @@ export class NotificationManager {
     }
   }
 
-  private buildExitNotification(session: PTYSession, exitCode: number): string {
-    const lineCount = session.buffer.length
-    let lastLine = ''
-    if (lineCount > 0) {
+  private buildExitNotification(
+    session: PTYSession | PTYSessionInfo,
+    exitCode: number,
+    brokerLastLine?: string
+  ): string {
+    const lineCount = 'buffer' in session ? session.buffer.length : session.lineCount
+    let lastLine = brokerLastLine ?? ''
+    if (brokerLastLine === undefined && 'buffer' in session && lineCount > 0) {
       for (let i = lineCount - 1; i >= 0; i--) {
-        const bufferLines = session.buffer.read(i, 1)
-        const line = bufferLines[0]
-        if (line !== undefined && line.trim() !== '') {
-          lastLine =
-            line.length > NOTIFICATION_LINE_TRUNCATE
-              ? `${line.slice(0, NOTIFICATION_LINE_TRUNCATE)}...`
-              : line
+        const line = session.buffer.read(i, 1)[0]
+        if (line?.trim()) {
+          lastLine = line
           break
         }
       }
+    }
+    if (lastLine.length > NOTIFICATION_LINE_TRUNCATE) {
+      lastLine = `${lastLine.slice(0, NOTIFICATION_LINE_TRUNCATE)}...`
     }
 
     const displayTitle = session.description ?? session.title

@@ -1,7 +1,7 @@
-Lists all PTY sessions (active and exited).
+Lists PTY sessions owned by this OpenCode process (active and exited).
 
 Use this tool to:
-- See all running and exited PTY sessions
+- See this process's running and exited PTY sessions
 - Get session IDs for use with other pty_* tools
 - Check the status and output line count of each session
 - Monitor which processes are still running

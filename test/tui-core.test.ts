@@ -38,9 +38,9 @@ describe('PTY TUI core', () => {
     )
   })
 
-  it('requires a fixed valid port', () => {
+  it('uses the shared broker default and rejects invalid ports', () => {
     expect(getPtyWebSocketUrl({ PTY_WEB_PORT: '0' })).toBeUndefined()
-    expect(getPtyWebSocketUrl({})).toBeUndefined()
+    expect(getPtyWebSocketUrl({})).toBe('ws://127.0.0.1:4097/ws')
   })
 
   it('matches OpenCode endpoints across hostname aliases but not ports', () => {

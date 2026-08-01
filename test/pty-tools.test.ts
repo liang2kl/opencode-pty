@@ -4,9 +4,42 @@ import { ptyRead } from '../src/plugin/pty/tools/read.ts'
 import { ptyList } from '../src/plugin/pty/tools/list.ts'
 import { RingBuffer } from '../src/plugin/pty/buffer.ts'
 import { manager } from '../src/plugin/pty/manager.ts'
+import { setBrokerClient } from '../src/plugin/pty/broker-client.ts'
 
 describe('PTY Tools', () => {
+  beforeEach(() => {
+    setBrokerClient({
+      async request(operation) {
+        switch (operation.type) {
+          case 'spawn':
+            return manager.spawn(operation.options) as never
+          case 'get':
+            return manager.get(operation.id) as never
+          case 'list':
+            return manager.list() as never
+          case 'write':
+            return manager.write(operation.id, operation.data) as never
+          case 'read':
+            return manager.read(operation.id, operation.offset, operation.limit) as never
+          case 'search':
+            return manager.search(
+              operation.id,
+              new RegExp(operation.pattern, operation.flags),
+              operation.offset,
+              operation.limit
+            ) as never
+          case 'kill':
+            return manager.kill(operation.id, operation.cleanup) as never
+          case 'cleanupBySession':
+            manager.cleanupBySession(operation.parentSessionId)
+            return true as never
+        }
+      },
+    })
+  })
+
   afterAll(() => {
+    setBrokerClient(undefined)
     mock.restore()
   })
   describe('ptySpawn', () => {
@@ -53,7 +86,7 @@ describe('PTY Tools', () => {
         description: 'Test session',
         parentSessionId: 'parent-session-id',
         parentAgent: 'test-agent',
-        workdir: undefined,
+        workdir: '/tmp',
         env: undefined,
         title: undefined,
         notifyOnExit: undefined,

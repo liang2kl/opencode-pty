@@ -1,57 +1,78 @@
 import type { PluginContext, PluginResult } from './plugin/types.ts'
-import { initManager, manager } from './plugin/pty/manager.ts'
 import { initPermissions } from './plugin/pty/permissions.ts'
+import { BrokerClient, setBrokerClient } from './plugin/pty/broker-client.ts'
+import type { BrokerOperation, BrokerResult } from './broker/protocol.ts'
 import { ptySpawn } from './plugin/pty/tools/spawn.ts'
 import { ptyWrite } from './plugin/pty/tools/write.ts'
 import { ptyRead } from './plugin/pty/tools/read.ts'
 import { ptyList } from './plugin/pty/tools/list.ts'
 import { ptyKill } from './plugin/pty/tools/kill.ts'
-import { PTYServer } from './web/server/server.ts'
 import open from 'open'
 
 const ptyOpenClientCommand = 'pty-open-background-spy'
 const ptyShowServerUrlCommand = 'pty-show-server-url'
 
-export const PTYPlugin = async ({
-  client,
-  directory,
-  serverUrl,
-}: PluginContext): Promise<PluginResult> => {
+export const PTYPlugin = async ({ client, directory }: PluginContext): Promise<PluginResult> => {
   initPermissions(client, directory)
-  initManager(client)
-  let ptyServer: PTYServer | undefined
+  let broker: BrokerClient | undefined
+  let brokerPromise: Promise<BrokerClient | undefined> | undefined
+  let disposed = false
 
-  const startServer = async () => {
-    if (ptyServer) return ptyServer
-    try {
-      ptyServer = await PTYServer.createServer(serverUrl.origin)
-      return ptyServer
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      await client.tui
-        .showToast({
-          body: { message: `PTY web server unavailable: ${message}`, variant: 'warning' },
-        })
-        .catch(() => {})
-    }
+  const connectBroker = async () => {
+    if (disposed) return
+    if (broker) return broker
+    if (brokerPromise) return brokerPromise
+    brokerPromise = BrokerClient.connect(client)
+      .then((connected) => {
+        if (disposed) {
+          connected[Symbol.dispose]()
+          return undefined
+        }
+        broker = connected
+        setBrokerClient(connected)
+        return connected
+      })
+      .catch((error) => {
+        if (disposed) return undefined
+        const message = error instanceof Error ? error.message : String(error)
+        void client.tui
+          .showToast({
+            body: { message: `PTY broker unavailable: ${message}`, variant: 'warning' },
+          })
+          .catch(() => {})
+        return undefined
+      })
+      .finally(() => {
+        brokerPromise = undefined
+      })
+    return brokerPromise
   }
 
-  await startServer()
+  await connectBroker()
+  setBrokerClient({
+    async request<T extends BrokerResult>(operation: BrokerOperation): Promise<T> {
+      const activeBroker = await connectBroker()
+      if (!activeBroker) throw new Error('PTY broker is unavailable')
+      return activeBroker.request<T>(operation)
+    },
+  })
 
   return {
     dispose: async () => {
-      ptyServer?.[Symbol.dispose]()
+      disposed = true
+      setBrokerClient(undefined)
+      broker?.[Symbol.dispose]()
     },
     'command.execute.before': async (input) => {
       if (input.command !== ptyOpenClientCommand && input.command !== ptyShowServerUrlCommand) {
         return
       }
-      const server = await startServer()
-      if (!server) throw new Error('PTY web server is unavailable')
+      const activeBroker = await connectBroker()
+      if (!activeBroker) throw new Error('PTY broker is unavailable')
       if (input.command === ptyOpenClientCommand) {
-        open(server.server.url.origin)
+        open(activeBroker.origin)
       } else if (input.command === ptyShowServerUrlCommand) {
-        const message = `PTY Sessions Web Interface URL: ${server.server.url.origin}`
+        const message = `PTY Sessions Web Interface URL: ${activeBroker.origin}`
         await client.tui.showToast({ body: { message, variant: 'info' } })
       }
       throw new Error('Command handled by PTY plugin')
@@ -78,7 +99,10 @@ export const PTYPlugin = async ({
     },
     event: async ({ event }) => {
       if (event.type === 'session.deleted') {
-        manager.cleanupBySession(event.properties.info.id)
+        await broker?.request({
+          type: 'cleanupBySession',
+          parentSessionId: event.properties.info.id,
+        })
       }
     },
   }

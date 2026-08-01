@@ -35,7 +35,7 @@ export async function createSession(req: Request) {
       await checkWorkdirPermission(body.workdir)
     }
 
-    const session = manager.spawn({
+    const session = manager.spawnOwned('web-api', {
       command: body.command,
       args,
       title: body.description,

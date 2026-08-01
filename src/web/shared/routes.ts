@@ -10,6 +10,10 @@ export const routes = {
     path: '/health',
     methods: ['GET'] as const,
   },
+  broker: {
+    path: '/api/broker',
+    methods: ['POST'] as const,
+  },
   sessions: {
     path: '/api/sessions',
     methods: ['GET', 'POST', 'DELETE'] as const,

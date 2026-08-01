@@ -12,9 +12,10 @@ import type {
   WSMessageServerSessionRemoved,
   WSMessageServerSessionUpdate,
 } from '../shared/types'
+import type { BrokerSocketData } from '../../broker/protocol.ts'
 
 export class CallbackManager implements Disposable {
-  constructor(private server: Bun.Server<undefined>) {
+  constructor(private server: Bun.Server<BrokerSocketData>) {
     this.server = server
     registerSessionUpdateCallback(this.sessionUpdateCallback)
     registerSessionRemoveCallback(this.sessionRemoveCallback)

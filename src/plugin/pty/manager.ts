@@ -1,6 +1,4 @@
-import type { OpencodeClient } from '@opencode-ai/sdk'
 import { Terminal } from 'bun-pty'
-import { NotificationManager } from './notification-manager.ts'
 import { OutputManager } from './output-manager.ts'
 import { SessionLifecycleManager } from './session-lifecycle.ts'
 import type { PTYSessionInfo, ReadResult, SearchResult, SpawnOptions } from './types.ts'
@@ -90,14 +88,50 @@ function notifyRawOutput(session: PTYSessionInfo, rawData: string): void {
   }
 }
 
-class PTYManager {
+export type SessionExitCallback = (
+  ownerId: string,
+  session: PTYSessionInfo,
+  exitCode: number,
+  lastLine: string
+) => void
+
+export const sessionExitCallbacks: SessionExitCallback[] = []
+
+export function registerSessionExitCallback(callback: SessionExitCallback): void {
+  sessionExitCallbacks.push(callback)
+}
+
+export function removeSessionExitCallback(callback: SessionExitCallback): void {
+  const index = sessionExitCallbacks.indexOf(callback)
+  if (index !== -1) sessionExitCallbacks.splice(index, 1)
+}
+
+function notifySessionExit(
+  ownerId: string,
+  session: PTYSessionInfo,
+  exitCode: number,
+  lastLine: string
+): void {
+  for (const callback of sessionExitCallbacks) {
+    try {
+      callback(ownerId, session, exitCode, lastLine)
+    } catch {
+      // Ignore callback errors
+    }
+  }
+}
+
+function getLastLine(lines: string[]): string {
+  for (let index = lines.length - 1; index >= 0; index--) {
+    const line = lines[index]
+    if (line?.trim()) return line
+  }
+  return ''
+}
+
+export class PTYManager {
   private lifecycleManager = new SessionLifecycleManager()
   private outputManager = new OutputManager()
-  private notificationManager = new NotificationManager()
-
-  init(client: OpencodeClient): void {
-    this.notificationManager.init(client)
-  }
 
   clearAllSessions(): void {
     const ids = this.list().map((session) => session.id)
@@ -106,16 +140,27 @@ class PTYManager {
   }
 
   spawn(opts: SpawnOptions): PTYSessionInfo {
+    return this.spawnOwned('legacy', opts)
+  }
+
+  spawnOwned(ownerId: string, opts: SpawnOptions): PTYSessionInfo {
     const session = this.lifecycleManager.spawn(
+      ownerId,
       opts,
       (session, data) => {
         notifyRawOutput(this.lifecycleManager.toInfo(session), data)
       },
       async (session, exitCode) => {
         if (!this.lifecycleManager.getSession(session.id)) return
-        notifySessionUpdate(this.lifecycleManager.toInfo(session))
-        if (session?.notifyOnExit) {
-          await this.notificationManager.sendExitNotification(session, exitCode || 0)
+        const info = this.lifecycleManager.toInfo(session)
+        notifySessionUpdate(info)
+        if (session.notifyOnExit) {
+          notifySessionExit(
+            session.ownerId,
+            info,
+            exitCode || 0,
+            getLastLine(session.buffer.read())
+          )
         }
       }
     )
@@ -163,6 +208,17 @@ class PTYManager {
     )
   }
 
+  owns(ownerId: string, id: string): boolean {
+    return this.lifecycleManager.getSession(id)?.ownerId === ownerId
+  }
+
+  listOwned(ownerId: string): PTYSessionInfo[] {
+    return this.lifecycleManager
+      .listSessions()
+      .filter((session) => session.ownerId === ownerId)
+      .map((session) => this.lifecycleManager.toInfo(session))
+  }
+
   getRawBuffer(id: string): { raw: string; byteLength: number } | null {
     return withSession(
       this.lifecycleManager,
@@ -189,10 +245,17 @@ class PTYManager {
     this.lifecycleManager.cleanupBySession(parentSessionId)
     ids.forEach(notifySessionRemove)
   }
+
+  cleanupByOwner(ownerId: string): void {
+    const ids = this.lifecycleManager
+      .listSessions()
+      .filter((session) => session.ownerId === ownerId)
+      .map((session) => session.id)
+    for (const id of ids) this.lifecycleManager.kill(id, true)
+    ids.forEach(notifySessionRemove)
+  }
 }
 
 export const manager = new PTYManager()
 
-export function initManager(opcClient: OpencodeClient): void {
-  manager.init(opcClient)
-}
+export function initManager(_client?: unknown): void {}

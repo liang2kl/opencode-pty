@@ -1,9 +1,9 @@
 import { tool } from '@opencode-ai/plugin'
-import { manager } from '../manager.ts'
+import { getBrokerClient } from '../broker-client.ts'
 import { DEFAULT_READ_LIMIT, MAX_LINE_LENGTH } from '../../../shared/constants.ts'
 import { buildSessionNotFoundError } from '../utils.ts'
 import { formatLine } from '../formatters.ts'
-import type { PTYSessionInfo } from '../types.ts'
+import type { PTYSessionInfo, ReadResult, SearchResult } from '../types.ts'
 import DESCRIPTION from './read.txt'
 
 const NOTIFY_ON_EXIT_REMINDER = [
@@ -96,17 +96,24 @@ function validateAndCreateRegex(pattern: string, ignoreCase?: boolean): RegExp {
 /**
  * Handles pattern-based reading and formatting
  */
-function handlePatternRead(
+async function handlePatternRead(
   id: string,
   pattern: string,
   ignoreCase: boolean | undefined,
   session: PTYSessionInfo,
   offset: number,
   limit: number
-): string {
+): Promise<string> {
   const regex = validateAndCreateRegex(pattern, ignoreCase)
 
-  const result = manager.search(id, regex, offset, limit)
+  const result = await getBrokerClient().request<SearchResult | null>({
+    type: 'search',
+    id,
+    pattern: regex.source,
+    flags: regex.flags,
+    offset,
+    limit,
+  })
   if (!result) {
     throw buildSessionNotFoundError(id)
   }
@@ -147,13 +154,18 @@ function handlePatternRead(
 /**
  * Handles plain reading and formatting
  */
-function handlePlainRead(
+async function handlePlainRead(
   args: ReadArgs,
   session: PTYSessionInfo,
   offset: number,
   limit: number
-): string {
-  const result = manager.read(args.id, offset, limit)
+): Promise<string> {
+  const result = await getBrokerClient().request<ReadResult | null>({
+    type: 'read',
+    id: args.id,
+    offset,
+    limit,
+  })
   if (!result) {
     throw buildSessionNotFoundError(args.id)
   }
@@ -238,7 +250,10 @@ export const ptyRead = tool({
       .describe('Case-insensitive pattern matching (default: false)'),
   },
   async execute(args) {
-    const session = manager.get(args.id)
+    const session = await getBrokerClient().request<PTYSessionInfo | null>({
+      type: 'get',
+      id: args.id,
+    })
     if (!session) {
       throw buildSessionNotFoundError(args.id)
     }
@@ -247,9 +262,9 @@ export const ptyRead = tool({
     const limit = args.limit ?? DEFAULT_READ_LIMIT
 
     if (args.pattern) {
-      return handlePatternRead(args.id, args.pattern, args.ignoreCase, session, offset, limit)
+      return await handlePatternRead(args.id, args.pattern, args.ignoreCase, session, offset, limit)
     } else {
-      return handlePlainRead(args, session, offset, limit)
+      return await handlePlainRead(args, session, offset, limit)
     }
   },
 })

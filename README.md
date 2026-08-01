@@ -22,8 +22,9 @@ This plugin gives the agent full control over multiple terminal sessions, like t
 - **Pattern Filtering**: Search output using regex (like `grep`)
 - **Exit Notifications**: Get notified when processes finish (eliminates polling)
 - **Permission Support**: Respects OpenCode's bash permission settings
-- **Session Lifecycle**: Sessions persist until explicitly killed
-- **Auto-cleanup**: PTYs are cleaned up when OpenCode sessions end
+- **Shared Broker**: Every OpenCode process uses one detached PTY server
+- **Process Lifecycle**: Exiting an OpenCode process kills only the PTYs it owns
+- **Auto-shutdown**: The broker exits after the final OpenCode process disconnects
 - **Web UI**: Modern React-based interface for session management
 - **Real-time Streaming**: WebSocket-based live output updates
 - **TUI Sidebar**: Session-scoped PTY status with clickable live-log dialogs
@@ -41,6 +42,9 @@ Add the plugin to your [OpenCode config](https://opencode.ai/docs/config/):
 
 That's it. OpenCode will automatically install the plugin on next run.
 
+The detached broker is launched with `bun` when available, or through `npx --yes bun` as a
+fallback.
+
 To show running PTYs in OpenCode's session sidebar, also add the package to your TUI config:
 
 ```json
@@ -50,7 +54,7 @@ To show running PTYs in OpenCode's session sidebar, also add the package to your
 }
 ```
 
-The sidebar requires OpenCode 1.18.10 or newer and a fixed `PTY_WEB_PORT`. Clicking a
+The sidebar requires OpenCode 1.18.10 or newer. Clicking a
 session name opens a live, sticky-bottom log dialog. Only PTYs created by the current
 OpenCode session appear in its sidebar.
 
@@ -72,7 +76,7 @@ opencode
 | `pty_spawn` | Create a new PTY session (command, args, workdir, env, title, notifyOnExit, timeoutSeconds) |
 | `pty_write` | Send input to a PTY (text, escape sequences like `\x03` for Ctrl+C)         |
 | `pty_read`  | Read output buffer with pagination and optional regex filtering             |
-| `pty_list`  | List all PTY sessions with status, PID, line count                          |
+| `pty_list`  | List this OpenCode process's PTY sessions with status, PID, line count      |
 | `pty_kill`  | Terminate a PTY, optionally cleanup the buffer                              |
 
 ## Slash Commands
@@ -99,7 +103,8 @@ If you name it "task" or "process" or anything else, the agent will sometimes ru
 1. Run opencode with the plugin.
 2. Run slash command `/pty-open-background-spy`.
 
-The server starts with the OpenCode plugin. This command launches the browser with the web UI.
+The first OpenCode process starts a detached shared broker. Later OpenCode processes acquire
+their own leases from the same broker. This command launches the browser with the web UI.
 
 ### Features
 
@@ -111,17 +116,20 @@ The server starts with the OpenCode plugin. This command launches the browser wi
 
 ### TUI Sidebar
 
-The optional TUI plugin connects to the same WebSocket used by the browser interface. Set a
-fixed port before starting OpenCode so the TUI process can locate it:
+The optional TUI plugin connects to the same broker used by every OpenCode process. The broker
+defaults to `127.0.0.1:4097`; override the address before starting OpenCode when remote access is
+needed:
 
 ```bash
+export PTY_WEB_HOSTNAME=100.72.194.42
 export PTY_WEB_PORT=4097
 ```
 
 The sidebar displays only running PTYs owned by the current OpenCode session. Click a PTY name
-to open its existing output buffer and continue streaming new output in real time. Relaunching
-an attached TUI and resuming the same session repopulates the panel from the running OpenCode
-backend. Restarting the backend itself still terminates its child PTY processes.
+to open its existing output buffer and continue streaming new output in real time. Each OpenCode
+process holds a broker lease: when that process exits, the broker kills and removes only its PTYs.
+Other OpenCode processes and their PTYs continue running. When the final process exits, the broker
+kills any remaining sessions and shuts itself down.
 
 ### REST API
 

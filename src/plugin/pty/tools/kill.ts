@@ -1,5 +1,6 @@
 import { tool } from '@opencode-ai/plugin'
-import { manager } from '../manager.ts'
+import { getBrokerClient } from '../broker-client.ts'
+import type { PTYSessionInfo } from '../types.ts'
 import { buildSessionNotFoundError } from '../utils.ts'
 import DESCRIPTION from './kill.txt'
 
@@ -13,14 +14,19 @@ export const ptyKill = tool({
       .describe('If true, removes the session and frees the buffer (default: false)'),
   },
   async execute(args) {
-    const session = manager.get(args.id)
+    const broker = getBrokerClient()
+    const session = await broker.request<PTYSessionInfo | null>({ type: 'get', id: args.id })
     if (!session) {
       throw buildSessionNotFoundError(args.id)
     }
 
     const wasRunning = session.status === 'running'
     const cleanup = args.cleanup ?? false
-    const success = manager.kill(args.id, cleanup)
+    const success = await broker.request<boolean>({
+      type: 'kill',
+      id: args.id,
+      cleanup,
+    })
 
     if (!success) {
       throw new Error(`Failed to kill PTY session '${args.id}'.`)

@@ -1,5 +1,6 @@
 import { tool } from '@opencode-ai/plugin'
-import { manager } from '../manager.ts'
+import { getBrokerClient } from '../broker-client.ts'
+import type { PTYSessionInfo } from '../types.ts'
 import { checkCommandPermission } from '../permissions.ts'
 import { buildSessionNotFoundError } from '../utils.ts'
 import DESCRIPTION from './write.txt'
@@ -60,7 +61,8 @@ export const ptyWrite = tool({
     data: tool.schema.string().describe('The input data to send to the PTY'),
   },
   async execute(args) {
-    const session = manager.get(args.id)
+    const broker = getBrokerClient()
+    const session = await broker.request<PTYSessionInfo | null>({ type: 'get', id: args.id })
     if (!session) {
       throw buildSessionNotFoundError(args.id)
     }
@@ -80,7 +82,7 @@ export const ptyWrite = tool({
       }
     }
 
-    const success = manager.write(args.id, parsedData)
+    const success = await broker.request<boolean>({ type: 'write', id: args.id, data: parsedData })
     if (!success) {
       throw new Error(`Failed to write to PTY '${args.id}'.`)
     }

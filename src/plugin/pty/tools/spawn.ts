@@ -1,5 +1,6 @@
 import { tool } from '@opencode-ai/plugin'
-import { manager } from '../manager.ts'
+import { getBrokerClient } from '../broker-client.ts'
+import type { PTYSessionInfo } from '../types.ts'
 import { checkCommandPermission, checkWorkdirPermission } from '../permissions.ts'
 import DESCRIPTION from './spawn.txt'
 
@@ -47,17 +48,21 @@ export const ptySpawn = tool({
     }
 
     const sessionId = ctx.sessionID
-    const info = manager.spawn({
-      command: args.command,
-      args: args.args,
-      workdir: args.workdir,
-      env: args.env,
-      title: args.title,
-      description: args.description,
-      parentSessionId: sessionId,
-      parentAgent: ctx.agent,
-      notifyOnExit: args.notifyOnExit,
-      timeoutSeconds: args.timeoutSeconds,
+    const info = await getBrokerClient().request<PTYSessionInfo>({
+      type: 'spawn',
+      processEnv: process.env as Record<string, string>,
+      options: {
+        command: args.command,
+        args: args.args,
+        workdir: args.workdir ?? ctx.directory,
+        env: args.env,
+        title: args.title,
+        description: args.description,
+        parentSessionId: sessionId,
+        parentAgent: ctx.agent,
+        notifyOnExit: args.notifyOnExit,
+        timeoutSeconds: args.timeoutSeconds,
+      },
     })
 
     const output = [

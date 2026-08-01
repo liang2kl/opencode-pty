@@ -1,13 +1,14 @@
 import { tool } from '@opencode-ai/plugin'
-import { manager } from '../manager.ts'
+import { getBrokerClient } from '../broker-client.ts'
 import { formatSessionInfo } from '../formatters.ts'
+import type { PTYSessionInfo } from '../types.ts'
 import DESCRIPTION from './list.txt'
 
 export const ptyList = tool({
   description: DESCRIPTION,
   args: {},
   async execute() {
-    const sessions = manager.list()
+    const sessions = await getBrokerClient().request<PTYSessionInfo[]>({ type: 'list' })
 
     if (sessions.length === 0) {
       return '<pty_list>\nNo active PTY sessions.\n</pty_list>'
